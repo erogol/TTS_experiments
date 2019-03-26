@@ -132,6 +132,11 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             postnet_loss = criterion(postnet_output, mel_input, mel_lengths)
         loss = decoder_loss + postnet_loss
 
+        # entropy loss
+        entropy = torch.distributions.Categorical(probs=alignments).entropy()
+        entropy_loss = (entropy / np.log(alignments.shape[1])).mean()
+        loss += 1e-4 * entropy_loss
+
         # backpass and check the grad norm for spec losses
         loss.backward(retain_graph=True)
         optimizer, current_lr = weight_decay(optimizer, c.wd)
@@ -150,10 +155,10 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if current_step % c.print_step == 0:
             print(
                 "   | > Step:{}/{}  GlobalStep:{}  TotalLoss:{:.5f}  PostnetLoss:{:.5f}  "
-                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  GradNorm:{:.5f}  "
+                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  EntropyLoss:{:.5f}  GradNorm:{:.5f}  "
                 "GradNormST:{:.5f}  AvgTextLen:{:.1f}  AvgSpecLen:{:.1f}  StepTime:{:.2f}  LR:{:.6f}".format(
                     num_iter, batch_n_iter, current_step, loss.item(),
-                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(),
+                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(), entropy_loss,
                     grad_norm, grad_norm_st, avg_text_length, avg_spec_length, step_time, current_lr),
                 flush=True)
 
