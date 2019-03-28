@@ -64,6 +64,8 @@ class Prenet(nn.Module):
     def forward(self, x):
         for linear in self.layers:
             x = F.relu(linear(x))
+            drop_rate = torch.rand(1).item() * 0.5
+            x = F.dropout(x, p=drop_rate, training=self.training)
         return x
         
 
