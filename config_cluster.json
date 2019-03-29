@@ -1,6 +1,6 @@
 {
-    "run_name": "nancy-bn",
-    "run_description": "Finetune 4378. No ending character ^.",
+    "run_name": "nancy-t2-original",
+    "run_description": "Train tacotron2 with original prenet and dropout",
 
     "audio":{
         // Audio processing parameters
