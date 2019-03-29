@@ -1,6 +1,6 @@
 {
     "run_name": "nancy-bn",
-    "run_description": "Finetune 4400. Text2phoneme fixed with tests. Random rate dropout used with BN on Prenet. Using only 2 GPUs but with 32 batch size.",
+    "run_description": "Text2phoneme fixed with tests. Random rate dropout used with BN on Prenet. Using only 2 GPUs but with 32 batch size.",
 
     "audio":{
         // Audio processing parameters
