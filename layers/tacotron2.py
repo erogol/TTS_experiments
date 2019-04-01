@@ -62,7 +62,7 @@ class Prenet(nn.Module):
 
     def forward(self, x):
         for linear in self.layers:
-            x = F.dropout(F.relu(linear(x)), p=0.5, training=True)
+            x = F.dropout(F.relu(linear(x)), p=0.5, training=self.training)
         return x
         
 
@@ -404,13 +404,12 @@ class Decoder(nn.Module):
             alignments += [alignment]
 
             stop_flags[0] = stop_flags[0] or stop_token > 0.5
-            stop_flags[1] = stop_flags[1] or (alignment[0, -1:].sum() > 0.5 and t > inputs.shape[1])
+            stop_flags[1] = stop_flags[1] or (alignment[0, -2:].sum() > 0.5 and t > inputs.shape[1])
             stop_flags[2] = t > inputs.shape[1]
             if all(stop_flags):
                 if stop_count == 20:
                     break
                 stop_count += 1
-                break
             elif len(outputs) == self.max_decoder_steps:
                 print("   | > Decoder stopped with 'max_decoder_steps")
                 break
