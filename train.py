@@ -12,6 +12,8 @@ import torch.nn as nn
 from tensorboardX import SummaryWriter
 from torch import optim
 from torch.utils.data import DataLoader
+import torch.distributed as dist
+
 
 from datasets.TTSDataset import MyDataset
 from distribute import (DistributedSampler, apply_gradient_allreduce,
@@ -141,7 +143,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         # backpass and check the grad norm for stop loss
         stop_loss.backward()
         optimizer_st, _ = weight_decay(optimizer_st, c.wd)
-        grad_norm_st, _ = check_update(model.decoder.stopnet, 1.0)
+        grad_norm_st, _ = check_update(model.module.decoder.stopnet, 1.0)
         optimizer_st.step()
 
         step_time = time.time() - start_time
@@ -422,7 +424,8 @@ def main(args):
 
     # DISTRUBUTED
     if num_gpus > 1:
-        model = apply_gradient_allreduce(model)
+        # model = apply_gradient_allreduce(model)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.rank], output_device=args.rank)
 
     if c.lr_decay:
         scheduler = NoamLR(

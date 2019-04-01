@@ -60,6 +60,7 @@ def reduce_tensor(tensor, n_gpus):
 	    rt /= n_gpus
 	    return rt
 
+
 def reduce_tensor(tensor, num_gpus):
     rt = tensor.clone()
     dist.all_reduce(rt, op=dist.reduce_op.SUM)
@@ -80,7 +81,7 @@ def init_distributed(rank, num_gpus, group_name, dist_backend, dist_url):
         world_size=num_gpus,
         rank=rank,
         group_name=group_name)
-
+    
 
 def apply_gradient_allreduce(module):
 
