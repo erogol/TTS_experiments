@@ -28,6 +28,8 @@ from utils.logger import Logger
 from utils.synthesis import synthesis
 from utils.text.symbols import phonemes, symbols
 from utils.visual import plot_alignment, plot_spectrogram
+from utils.mixup import mixup_criterion, mixup_data
+
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -104,6 +106,17 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         current_step = num_iter + args.restore_step + \
             epoch * len(data_loader) + 1
 
+        # mixup
+        text_input, mel_input_a, mel_input_b, index_mixup, lam = mixup_data(text_input, mel_input)
+        mel_input = lam * mel_input_a + (1 - lam) * mel_input_b[index_mixup, :]  # for autoregression
+
+        text_lengths = torch.max(text_lengths, text_lengths[index_mixup])
+        text_lengths, sort_index = torch.sort(text_lengths, descending=True)
+        text_input = text_input[sort_index]
+        mel_input = mel_input[sort_index]
+        mel_input_a = mel_input_a[sort_index]
+        mel_input_b = mel_input_b[sort_index]
+
         # setup lr
         if c.lr_decay:
             scheduler.step()
@@ -115,6 +128,8 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             text_input = text_input.cuda(non_blocking=True)
             text_lengths = text_lengths.cuda(non_blocking=True)
             mel_input = mel_input.cuda(non_blocking=True)
+            mel_input_a = mel_input_a.cuda(non_blocking=True)
+            mel_input_b = mel_input_b.cuda(non_blocking=True)
             mel_lengths = mel_lengths.cuda(non_blocking=True)
             linear_input = linear_input.cuda(non_blocking=True) if c.model == "Tacotron" else None
             stop_targets = stop_targets.cuda(non_blocking=True)
@@ -124,12 +139,12 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             text_input, text_lengths,  mel_input)
 
         # loss computation
-        stop_loss = criterion_st(stop_tokens, stop_targets)
-        decoder_loss = criterion(decoder_output, mel_input, mel_lengths)
+        stop_loss = mixup_criterion(criterion_st, stop_tokens, stop_targets[sort_index], stop_targets[index_mixup][sort_index], lam)
+        decoder_loss = mixup_criterion(criterion, decoder_output, mel_input_a, mel_input_b, lam, mel_lengths[sort_index], mel_lengths[index_mixup][sort_index])
         if c.model == "Tacotron":
-            postnet_loss = criterion(postnet_output, linear_input, mel_lengths)
+            postnet_loss = criterion(postnet_output, linear_input, mel_lengths[sort_index])
         else:
-            postnet_loss = criterion(postnet_output, mel_input, mel_lengths)
+            postnet_loss = mixup_criterion(criterion, postnet_output, mel_input_a, mel_input_b, lam, mel_lengths[sort_index], mel_lengths[index_mixup][sort_index])
         loss = decoder_loss + postnet_loss
 
         # backpass and check the grad norm for spec losses
