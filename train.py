@@ -125,7 +125,6 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
 
         # loss computation
         stop_loss = criterion_st(stop_tokens, stop_targets)
-        print(stop_targets)
         decoder_loss = criterion(decoder_output, mel_input)
         if c.model == "Tacotron":
             postnet_loss = criterion(postnet_output, linear_input)
