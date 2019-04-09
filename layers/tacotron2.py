@@ -272,11 +272,13 @@ class Encoder(nn.Module):
 
 # adapted from https://github.com/NVIDIA/tacotron2/
 class Decoder(nn.Module):
-    def __init__(self, in_features, inputs_dim, r, attn_win, attn_norm, prenet_type, forward_attn):
+    def __init__(self, in_features, inputs_dim, r, attn_win, attn_norm, prenet_type, forward_attn, memory_size=None):
         super(Decoder, self).__init__()
         self.mel_channels = inputs_dim
         self.r = r
         self.encoder_embedding_dim = in_features
+        self.memory_size = r if memory_size is None else memory_size
+        assert self.memory_size >= self.r,  "c.memory_size must be >= c.r."
         self.attention_rnn_dim = 1024
         self.decoder_rnn_dim = 1024
         self.prenet_dim = 256
@@ -285,7 +287,7 @@ class Decoder(nn.Module):
         self.p_attention_dropout = 0.1
         self.p_decoder_dropout = 0.1
 
-        self.prenet = Prenet(self.mel_channels * r, prenet_type,
+        self.prenet = Prenet(self.mel_channels * self.memory_size, prenet_type,
                              [self.prenet_dim, self.prenet_dim])
 
         self.attention_rnn = nn.LSTMCell(self.prenet_dim + in_features,
@@ -308,13 +310,14 @@ class Decoder(nn.Module):
                    init_gain='sigmoid'))
 
         self.attention_rnn_init = nn.Embedding(1, self.attention_rnn_dim)
-        self.go_frame_init = nn.Embedding(1, self.mel_channels * r)
+        self.go_frame_init = nn.Embedding(1, self.mel_channels * self.memory_size)
         self.decoder_rnn_inits = nn.Embedding(1, self.decoder_rnn_dim)
         self.memory_truncated = None
 
     def get_go_frame(self, inputs):
         B = inputs.size(0)
-        memory = self.go_frame_init(inputs.data.new_zeros(B).long())
+        # memory = self.go_frame_init(inputs.data.new_zeros(B).long())
+        memory = inputs.data.new_zeros(B, self.memory_size * self.mel_channels).float()
         return memory
 
     def _init_states(self, inputs, mask, keep_states=False):
@@ -358,6 +361,16 @@ class Decoder(nn.Module):
         outputs = outputs.transpose(1, 2)
         return outputs, stop_tokens, alignments
 
+    def _update_memory_queue(self, memory_queue, new_memory):
+        if self.memory_size > 1:
+            memory_queue = torch.cat([
+                memory_queue[:, self.r * self.mel_channels:].clone(),
+                new_memory
+            ], dim=-1)
+        else:
+            memory_queue = new_memory
+        return memory_queue
+
     def decode(self, memory):
         cell_input = torch.cat((memory, self.context), -1)
         self.attention_hidden, self.attention_cell = self.attention_rnn(
@@ -396,20 +409,20 @@ class Decoder(nn.Module):
         return decoder_output, gate_prediction, self.attention_weights
 
     def forward(self, inputs, memories, mask):
-        memory = self.get_go_frame(inputs).unsqueeze(0)
+        memory_queue = self.get_go_frame(inputs)
         memories = self._reshape_memory(memories)
-        memories = torch.cat((memory, memories), dim=0)
-        memories = self.prenet(memories)
 
         self._init_states(inputs, mask=mask)
         if self.attention_layer.forward_attn:
             self.attention_layer.init_forward_attn_state(inputs)
 
         outputs, stop_tokens, alignments = [], [], []
-        while len(outputs) < memories.size(0) - 1:
-            memory = memories[len(outputs)]
-            mel_output, stop_token, attention_weights = self.decode(
-                memory)
+        while len(outputs) < memories.size(0):
+            if len(outputs) > 0:
+                memory = memories[len(outputs)-1]
+                memory_queue = self._update_memory_queue(memory_queue, memory)
+            memory = self.prenet(memory_queue)
+            mel_output, stop_token, attention_weights = self.decode(memory)
             outputs += [mel_output.squeeze(1)]
             stop_tokens += [stop_token.squeeze(1)]
             alignments += [attention_weights]
@@ -420,7 +433,7 @@ class Decoder(nn.Module):
         return outputs, stop_tokens, alignments
 
     def inference(self, inputs):
-        memory = self.get_go_frame(inputs)
+        memory_queue = self.get_go_frame(inputs)
         self._init_states(inputs, mask=None)
 
         self.attention_layer.init_win_idx()
@@ -431,7 +444,9 @@ class Decoder(nn.Module):
         stop_flags = [True, False, False]
         stop_count = 0
         while True:
-            memory = self.prenet(memory)
+            if len(outputs) > 0:
+                memory_queue = self._update_memory_queue(memory_queue, memory)
+            memory = self.prenet(memory_queue)
             mel_output, stop_token, alignment = self.decode(memory)
             stop_token = torch.sigmoid(stop_token.data)
             outputs += [mel_output.squeeze(1)]

@@ -250,5 +250,5 @@ def setup_model(num_chars, c):
     if c.model.lower() == "tacotron":
         model = MyModel(num_chars=num_chars, r=c.r, attn_norm=c.attention_norm, memory_size=c.memory_size)
     elif c.model.lower() == "tacotron2":
-        model = MyModel(num_chars=num_chars, r=c.r, attn_norm=c.attention_norm, prenet_type=c.prenet_type, forward_attn=c.use_forward_attn)
+        model = MyModel(num_chars=num_chars, r=c.r, attn_norm=c.attention_norm, prenet_type=c.prenet_type, forward_attn=c.use_forward_attn, memory_size=c.memory_size)
     return model
