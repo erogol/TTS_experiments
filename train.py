@@ -73,7 +73,7 @@ def setup_loader(is_val=False, verbose=False):
     return loader
 
 
-def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
+def train(model, criterion, criterion_st, optimizer, scheduler,
           ap, epoch):
     data_loader = setup_loader(is_val=False, verbose=(epoch==0))
     model.train()
@@ -109,7 +109,6 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if c.lr_decay:
             scheduler.step()
         optimizer.zero_grad()
-        optimizer_st.zero_grad()
 
         # dispatch data to GPU
         if use_cuda:
@@ -138,19 +137,13 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
                 postnet_loss = criterion(postnet_output, linear_input)
             else:
                 postnet_loss = criterion(postnet_output, mel_input)
-        loss = decoder_loss + postnet_loss
+        loss = decoder_loss + postnet_loss + stop_loss
 
         # backpass and check the grad norm for spec losses
-        loss.backward(retain_graph=True)
+        loss.backward()
         optimizer, current_lr = weight_decay(optimizer, c.wd)
         grad_norm, _ = check_update(model, c.grad_clip)
         optimizer.step()
-
-        # backpass and check the grad norm for stop loss
-        stop_loss.backward()
-        optimizer_st, _ = weight_decay(optimizer_st, c.wd)
-        grad_norm_st, _ = check_update(model.decoder.stopnet, 1.0)
-        optimizer_st.step()
 
         step_time = time.time() - start_time
         epoch_time += step_time
@@ -190,9 +183,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             if current_step % c.save_step == 0:
                 if c.checkpoint:
                     # save model
-                    save_checkpoint(model, optimizer, optimizer_st,
-                                    postnet_loss.item(), OUT_PATH, current_step,
-                                    epoch)
+                    save_checkpoint(model, optimizer, postnet_loss.item(), OUT_PATH, current_step, epoch)
 
                 # Diagnostic visualizations
                 const_spec = postnet_output[0].data.cpu().numpy()
@@ -395,8 +386,6 @@ def main(args):
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
 
     optimizer = optim.Adam(model.parameters(), lr=c.lr, weight_decay=0)
-    optimizer_st = optim.Adam(
-        model.decoder.stopnet.parameters(), lr=c.lr, weight_decay=0)
 
     if c.loss_masking:
         criterion = L1LossMasked() if c.model == "Tacotron" else MSELossMasked()
@@ -458,8 +447,7 @@ def main(args):
 
     for epoch in range(0, c.epochs):
         train_loss, current_step = train(model, criterion, criterion_st,
-                                         optimizer, optimizer_st, scheduler,
-                                         ap, epoch)
+                                         optimizer, scheduler, ap, epoch)
         val_loss = evaluate(model, criterion, criterion_st, ap, current_step, epoch)
         print(
             " | > Training Loss: {:.5f}   Validation Loss: {:.5f}".format(
