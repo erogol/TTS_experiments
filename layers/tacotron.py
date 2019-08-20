@@ -2,6 +2,7 @@
 import torch
 from torch import nn
 from .common_layers import Prenet, Attention
+from sru import SRU, SRUCell
 
 
 class BatchNormConv1d(nn.Module):
@@ -160,11 +161,10 @@ class CBHG(nn.Module):
             for _ in range(num_highways)
         ])
         # bi-directional GPU layer
-        self.gru = nn.GRU(
+        self.gru = SRU(
             gru_features,
             gru_features,
             1,
-            batch_first=True,
             bidirectional=True)
 
     def forward(self, inputs):
@@ -198,9 +198,10 @@ class CBHG(nn.Module):
             x = highway(x)
         # (B, T_in, hid_features*2)
         # TODO: replace GRU with convolution as in Deep Voice 3
-        self.gru.flatten_parameters()
+        # self.gru.flatten_parameters()
+        x = x.transpose(0, 1)
         outputs, _ = self.gru(x)
-        return outputs
+        return outputs.transpose(0, 1)
 
 
 class EncoderCBHG(nn.Module):
@@ -292,7 +293,7 @@ class Decoder(nn.Module):
             out_features=[256, 128])
         # processed_inputs, processed_memory -> |Attention| -> Attention, attention, RNN_State
         # attention_rnn generates queries for the attention mechanism
-        self.attention_rnn = nn.GRUCell(in_features + 128, self.query_dim)
+        self.attention_rnn = SRUCell(in_features + 128, self.query_dim)
 
         self.attention = Attention(query_dim=self.query_dim,
                                    embedding_dim=in_features,
@@ -309,7 +310,7 @@ class Decoder(nn.Module):
         self.project_to_decoder_in = nn.Linear(256 + in_features, 256)
         # decoder_RNN_input -> |RNN| -> RNN_state
         self.decoder_rnns = nn.ModuleList(
-            [nn.GRUCell(256, 256) for _ in range(2)])
+            [SRUCell(256, 256) for _ in range(2)])
         # RNN_state -> |Linear| -> mel_spec
         self.proj_to_mel = nn.Linear(256, memory_dim * self.r_init)
         # learn init values instead of zero init.
@@ -344,10 +345,17 @@ class Decoder(nn.Module):
             self.memory_input = torch.zeros(B, self.memory_dim, device=inputs.device)
         # decoder states
         self.attention_rnn_hidden = torch.zeros(B, 256, device=inputs.device)
+        self.attention_rnn_context = torch.zeros(B, 256, device=inputs.device)
+
         self.decoder_rnn_hiddens = [
             torch.zeros(B, 256, device=inputs.device)
             for idx in range(len(self.decoder_rnns))
         ]
+        self.decoder_rnn_contexts = [
+            torch.zeros(B, 256, device=inputs.device)
+            for idx in range(len(self.decoder_rnns))
+        ]
+
         self.context_vec = inputs.data.new(B, self.in_features).zero_()
         # cache attention inputs
         self.processed_inputs = self.attention.inputs_layer(inputs)
@@ -363,9 +371,9 @@ class Decoder(nn.Module):
         # Prenet
         processed_memory = self.prenet(self.memory_input)
         # Attention RNN
-        self.attention_rnn_hidden = self.attention_rnn(
+        self.attention_rnn_hidden, self.attention_rnn_context = self.attention_rnn(
             torch.cat((processed_memory, self.context_vec), -1),
-            self.attention_rnn_hidden)
+            self.attention_rnn_context)
         self.context_vec = self.attention(
             self.attention_rnn_hidden, inputs, self.processed_inputs, mask)
         # Concat RNN output and attention context vector
@@ -374,8 +382,8 @@ class Decoder(nn.Module):
 
         # Pass through the decoder RNNs
         for idx in range(len(self.decoder_rnns)):
-            self.decoder_rnn_hiddens[idx] = self.decoder_rnns[idx](
-                decoder_input, self.decoder_rnn_hiddens[idx])
+            self.decoder_rnn_hiddens[idx], self.decoder_rnn_contexts[idx] = self.decoder_rnns[idx](
+                decoder_input, self.decoder_rnn_contexts[idx])
             # Residual connection
             decoder_input = self.decoder_rnn_hiddens[idx] + decoder_input
         decoder_output = decoder_input

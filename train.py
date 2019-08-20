@@ -543,6 +543,7 @@ def main(args): #pylint: disable=redefined-outer-name
             r, c.batch_size = gradual_training_scheduler(global_step, c)
             c.r = r
             model.decoder.set_r(r)
+        print(" > Batch size: ", c.batch_size)
         print(" > Number of outputs per iteration:", model.decoder.r)
 
         train_loss, global_step = train(model, criterion, criterion_st,
