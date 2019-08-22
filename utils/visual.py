@@ -3,7 +3,7 @@ import librosa
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from TTS.utils.text import phoneme_to_sequence, sequence_to_phoneme
+from TTS.utils.text import phoneme_to_sequence, sequence_to_phoneme, text_to_sequence, sequence_to_text
 
 
 def plot_alignment(alignment, info=None, fig_size=(16, 10), title=None):
@@ -56,6 +56,10 @@ def visualize(alignment, spectrogram_postnet, stop_tokens, text, hop_length, CON
     if CONFIG.use_phonemes:
         seq = phoneme_to_sequence(text, [CONFIG.text_cleaner], CONFIG.phoneme_language, CONFIG.enable_eos_bos_chars)
         text = sequence_to_phoneme(seq)
+        print(text)
+    else:
+        seq = text_to_sequence(text, [CONFIG.text_cleaner])
+        text = sequence_to_text(seq)
         print(text)
     plt.yticks(range(len(text)), list(text))
     plt.colorbar()
