@@ -9,7 +9,7 @@ through Unidecode. For other data, you can modify _characters. See TRAINING_DATA
 _pad = '_'
 _eos = '~'
 _bos = '^'
-_characters = 'ABCÇDEFGĞHIİJKLMNOÖPQRSŞTUÜVWXYZabcçdefgğhıijklmnoöpqrsştuüvwxyzâ!\'(),-.:;? '
+_characters = 'ABCÇDEFGĞHIİJKLMNOÖPQRSŞTUÜVWXYZabcçdefgğhıijklmnoöpqrsştuüvwxyzÂâÎîÛû!\'(),-.:;? '
 _punctuations = '!\'(),-.:;? '
 _phoneme_punctuations = '.!;:,?'
 
