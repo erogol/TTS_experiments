@@ -9,9 +9,16 @@
     "run_description": "tacotron2 without bidirectional decoder",
 =======
     "run_name": "turkish",
+<<<<<<< HEAD
     "run_description": "turkish female model",
 >>>>>>> turkish updates
+<<<<<<< HEAD
 >>>>>>> turkish updates
+=======
+=======
+    "run_description": "turkish female model wıth chars",
+>>>>>>> turkish chars
+>>>>>>> turkish chars
 
     // AUDIO PARAMETERS
     "audio":{
