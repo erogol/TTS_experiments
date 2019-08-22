@@ -1,14 +1,19 @@
 {
+<<<<<<< HEAD
     "model": "Tacotron2",          // one of the model in models/  
     "run_name": "ljspeech",
     "run_description": "tacotron2 without bidirectional decoder",
+=======
+    "run_name": "turkish",
+    "run_description": "turkish female model",
+>>>>>>> turkish updates
 
     // AUDIO PARAMETERS
     "audio":{
         // Audio processing parameters
         "num_mels": 80,         // size of the mel spec frame. 
         "num_freq": 1025,       // number of stft frequency levels. Size of the linear spectogram frame.
-        "sample_rate": 22050,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
+        "sample_rate": 16000,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
         "frame_length_ms": 50,  // stft window length in ms.
         "frame_shift_ms": 12.5, // stft window hop-lengh in ms.
         "preemphasis": 0.98,    // pre-emphasis to reduce spec noise and make it more structured. If 0.0, no -pre-emphasis.
@@ -88,6 +93,7 @@
     "batch_group_size": 0,  //Number of batches to shuffle after bucketing.
     "min_seq_len": 6,       // DATASET-RELATED: minimum text length to use in training
     "max_seq_len": 150,     // DATASET-RELATED: maximum text length
+<<<<<<< HEAD
 
     // PATHS
     // "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
@@ -99,6 +105,15 @@
     "phoneme_language": "en-us",     // depending on your target language, pick one from  https://github.com/bootphon/phonemizer#languages
 
     // MULTI-SPEAKER and GST
+=======
+    "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
+    "num_loader_workers": 4,        // number of training data loader processes. Don't set it too big. 4-8 are good values.
+    "num_val_loader_workers": 4,    // number of evaluation data loader processes.
+    "phoneme_cache_path": "mozilla_tr_phonemes",  // phoneme computation is slow, therefore, it caches results in the given folder.
+    "use_phonemes": false,           // use phonemes instead of raw characters. It is suggested for better pronounciation.
+    "phoneme_language": "tr",     // depending on your target language, pick one from  https://github.com/bootphon/phonemizer#languages
+    "text_cleaner": "phoneme_cleaners",
+>>>>>>> turkish updates
     "use_speaker_embedding": false,     // use speaker embedding to enable multi-speaker learning.
     "style_wav_for_test": null,          // path to style wav file to be used in TacotronGST inference.
     "use_gst": false,       // TACOTRON ONLY: use global style tokens
@@ -107,11 +122,18 @@
     "datasets":   // List of datasets. They all merged and they get different speaker_ids.
         [
             {
+<<<<<<< HEAD
                 "name": "ljspeech",
                 // "path": "/data/ro/shared/data/keithito/LJSpeech-1.1/",
                 "path": "/home/erogol/Data/LJSpeech-1.1",
                 "meta_file_train": "metadata_train.csv",
                 "meta_file_val": "metadata_val.csv"
+=======
+                "name": "custom_turkish",
+                "path": "/home/erogol/projects/turkish/",
+                "meta_file_train": "turkish_train.csv",
+                "meta_file_val": "turkish_eval.csv"
+>>>>>>> turkish updates
             }
         ]
 
