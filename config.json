@@ -1,16 +1,36 @@
 {
+<<<<<<< HEAD
     "model": "Tacotron2",          // one of the model in models/  
+<<<<<<< HEAD
     "run_name": "mean-var-guided",
     "run_description": "guided-attn-loss with mean-var normalization",
+=======
+    "run_name": "ljspeech",
+    "run_description": "tacotron2 without bidirectional decoder",
+=======
+    "run_name": "turkish",
+    "run_description": "turkish female model",
+>>>>>>> turkish updates
+>>>>>>> turkish updates
 
     // AUDIO PARAMETERS
     "audio":{
         // Audio processing parameters
         "num_mels": 80,         // size of the mel spec frame. 
+<<<<<<< HEAD
         "num_freq": 513,       // number of stft frequency levels. Size of the linear spectogram frame.
         "sample_rate": 22050,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
         "win_length": 1024,     // stft window length in ms.
         "hop_length": 256,      // stft window hop-lengh in ms.
+=======
+        "num_freq": 1025,       // number of stft frequency levels. Size of the linear spectogram frame.
+        "sample_rate": 16000,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
+        "frame_length_ms": 50,  // stft window length in ms.
+        "frame_shift_ms": 12.5, // stft window hop-lengh in ms.
+        "preemphasis": 0.98,    // pre-emphasis to reduce spec noise and make it more structured. If 0.0, no -pre-emphasis.
+        "min_level_db": -100,   // normalization range
+        "ref_level_db": 20,     // reference level db, theoretically 20db is the sound of air.
+>>>>>>> turkish updates
         "power": 1.5,           // value to sharpen wav signals after GL algorithm.
         "griffin_lim_iters": 60,// #griffin-lim iterations. 30-60 is a good range. Larger the value, slower the generation.
         "mel_fmin": 0.0,         // minimum freq level for mel-spec. ~50 for male and ~95 for female voices. Tune for dataset!!
@@ -102,10 +122,10 @@
     "datasets":   // List of datasets. They all merged and they get different speaker_ids.
         [
             {
-                "name": "ljspeech", 
-                "path": "/root/LJSpeech-1.1/",
-                "meta_file_train": "metadata.csv",
-                "meta_file_val": null
+                "name": "custom_turkish",
+                "path": "/home/erogol/projects/turkish/",
+                "meta_file_train": "turkish_train.csv",
+                "meta_file_val": "turkish_eval.csv"
             }
         ]
 
