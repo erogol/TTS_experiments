@@ -63,6 +63,14 @@ def convert_to_ascii(text):
     return unidecode(text)
 
 
+def basic_turkish_cleaners(text):
+    '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
+    text = text.replace("I", "ı")
+    text = lowercase(text)
+    text = collapse_whitespace(text)
+    return text
+
+
 def basic_cleaners(text):
     '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
     text = lowercase(text)
