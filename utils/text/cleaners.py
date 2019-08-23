@@ -63,6 +63,7 @@ def convert_to_ascii(text):
     return unidecode(text)
 
 
+<<<<<<< HEAD
 def remove_aux_symbols(text):
     text = re.sub(r'[\<\>\(\)\[\]\"]+', '', text)
     return text
@@ -73,6 +74,13 @@ def replace_symbols(text):
     text = text.replace('-', ' ')
     text = text.replace(':', ' ')
     text = text.replace('&', 'and')
+=======
+def basic_turkish_cleaners(text):
+    '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
+    text = text.replace("I", "ı")
+    text = lowercase(text)
+    text = collapse_whitespace(text)
+>>>>>>> turkish cleaner added
     return text
 
 
