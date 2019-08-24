@@ -108,6 +108,12 @@
     "num_loader_workers": 4,        // number of training data loader processes. Don't set it too big. 4-8 are good values.
     "num_val_loader_workers": 4,    // number of evaluation data loader processes.
     "batch_group_size": 0,  //Number of batches to shuffle after bucketing.
+<<<<<<< HEAD
+=======
+
+    "run_eval": true,
+    "test_delay_epochs": 5,  //Until attention is aligned, testing only wastes computation time.
+>>>>>>> updates
     "min_seq_len": 6,       // DATASET-RELATED: minimum text length to use in training
     "max_seq_len": 153,     // DATASET-RELATED: maximum text length
     "mean_var_norm": true,   // Normalizing spectrograms with mean-var ONLY for TACOTRON2 for now
@@ -131,10 +137,14 @@
     "use_phonemes": false,           // use phonemes instead of raw characters. It is suggested for better pronounciation.
     "phoneme_language": "tr",     // depending on your target language, pick one from  https://github.com/bootphon/phonemizer#languages
 <<<<<<< HEAD
+<<<<<<< HEAD
     "text_cleaner": "phoneme_cleaners",
 >>>>>>> turkish updates
 =======
     "text_cleaner": "basic_cleaners",
+=======
+    "text_cleaner": "basic_turkish_cleaners",
+>>>>>>> updates
     "test_sentences_file": "turkish_text.txt",
 >>>>>>> some fixes for turkish
 >>>>>>> some fixes for turkish
