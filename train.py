@@ -30,6 +30,8 @@ from TTS.utils.visual import plot_alignment, plot_spectrogram
 from TTS.datasets.preprocess import get_preprocessor_by_name
 from TTS.utils.radam import RAdam
 
+## Duration predictor
+from TTS.models.duration_predictor import DurationPredictor, DurationPredictorLoss
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -84,7 +86,7 @@ def setup_loader(ap, is_val=False, verbose=False):
 
 
 def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
-          ap, global_step, epoch):
+          ap, global_step, epoch, model_duration, criterion_duration, optimizer_duration):
     data_loader = setup_loader(ap, is_val=False, verbose=(epoch == 0))
     if c.use_speaker_embedding:
         speaker_mapping = load_speaker_mapping(OUT_PATH)
@@ -183,6 +185,17 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             optimizer_st.step()
         else:
             grad_norm_st = 0
+
+        ## DURATION MODEL
+        optimizer_duration.zero_grad()
+        with torch.no_grad():
+            durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
+        duration_pred = model_duration.forward(model.encoder_outputs.detach())
+        loss_duration = criterion_duration(duration_pred, durations)
+        loss_duration.backward()
+        optimizer_duration.step()
+
+        ## END DURATION MODEL
         
         step_time = time.time() - start_time
         epoch_time += step_time
@@ -190,11 +203,11 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if global_step % c.print_step == 0:
             print(
                 "   | > Step:{}/{}  GlobalStep:{}  TotalLoss:{:.5f}  PostnetLoss:{:.5f}  "
-                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  GradNorm:{:.5f}  "
+                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  DurLoss:{:.5f}  GradNorm:{:.5f}  "
                 "GradNormST:{:.5f}  AvgTextLen:{:.1f}  AvgSpecLen:{:.1f}  StepTime:{:.2f}  "
                 "LoaderTime:{:.2f}  LR:{:.6f}".format(
                     num_iter, batch_n_iter, global_step, loss.item(),
-                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(),
+                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(), loss_duration.item(),
                     grad_norm, grad_norm_st, avg_text_length, avg_spec_length, step_time,
                     loader_time, current_lr),
                 flush=True)
@@ -284,7 +297,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
     return avg_postnet_loss, global_step
 
 
-def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
+def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_duration, criterion_duration):
     data_loader = setup_loader(ap, is_val=True)
     if c.use_speaker_embedding:
         speaker_mapping = load_speaker_mapping(OUT_PATH)
@@ -362,15 +375,22 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
                         postnet_loss = criterion(postnet_output, mel_input)
                 loss = decoder_loss + postnet_loss + stop_loss
 
+                ## DURATION MODEL
+                durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
+                duration_pred = model_duration.forward(model.encoder_outputs.detach())
+                loss_duration = criterion_duration(duration_pred, durations)
+                ## END DURATION MODEL
+
                 step_time = time.time() - start_time
                 epoch_time += step_time
 
                 if num_iter % c.print_step == 0:
                     print(
-                        "   | > TotalLoss: {:.5f}   PostnetLoss: {:.5f}   DecoderLoss:{:.5f}  "
+                        "   | > TotalLoss: {:.5f}   PostnetLoss: {:.5f}   DecoderLoss: {:.5f}  DurationLoss: {:.5f}  "
                         "StopLoss: {:.5f}  ".format(loss.item(),
                                                     postnet_loss.item(),
                                                     decoder_loss.item(),
+                                                    loss_duration.item(),
                                                     stop_loss.item()),
                         flush=True)
 
@@ -478,6 +498,11 @@ def main(args): #pylint: disable=redefined-outer-name
 
     model = setup_model(num_chars, num_speakers, c)
 
+    # duration model
+    model_duration = DurationPredictor(256)
+    criterion_duration = DurationPredictorLoss()
+    optimizer_duration = RAdam(model_duration.parameters(), lr=0.001)
+
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
 
     optimizer = RAdam(model.parameters(), lr=c.lr, weight_decay=0)
@@ -494,7 +519,10 @@ def main(args): #pylint: disable=redefined-outer-name
     criterion_st = nn.BCEWithLogitsLoss() if c.stopnet else None
 
     if args.restore_path:
-        checkpoint = torch.load(args.restore_path)
+        if num_gpus==0:
+            checkpoint = torch.load(args.restore_path, map_location=torch.device('cpu'))
+        else:
+            checkpoint = torch.load(args.restore_path)
         try:
             # TODO: fix optimizer init, model.cuda() needs to be called before
             # optimizer restore
@@ -519,6 +547,8 @@ def main(args): #pylint: disable=redefined-outer-name
     if use_cuda:
         model = model.cuda()
         criterion.cuda()
+        model_duration = model_duration.cuda()
+        criterion_duration = criterion_duration.cuda()
         if criterion_st:
             criterion_st.cuda()
 
@@ -551,8 +581,8 @@ def main(args): #pylint: disable=redefined-outer-name
 
         train_loss, global_step = train(model, criterion, criterion_st,
                                         optimizer, optimizer_st, scheduler,
-                                        ap, global_step, epoch)
-        val_loss = evaluate(model, criterion, criterion_st, ap, global_step, epoch)
+                                        ap, global_step, epoch, model_duration, criterion_duration, optimizer_duration)
+        val_loss = evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_duration, criterion_duration)
         print(
             " | > Training Loss: {:.5f}   Validation Loss: {:.5f}".format(
                 train_loss, val_loss),

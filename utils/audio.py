@@ -8,6 +8,7 @@ import scipy.signal
 class AudioProcessor(object):
     def __init__(self,
                  sample_rate=None,
+                 resample=None,
                  num_mels=None,
                  min_level_db=None,
                  frame_shift_ms=None,

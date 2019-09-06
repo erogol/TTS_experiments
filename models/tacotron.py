@@ -42,11 +42,11 @@ class Tacotron(nn.Module):
         B = characters.size(0)
         mask = sequence_mask(text_lengths).to(characters.device)
         inputs = self.embedding(characters)
-        encoder_outputs = self.encoder(inputs)
-        encoder_outputs = self._add_speaker_embedding(encoder_outputs,
+        self.encoder_outputs = self.encoder(inputs)
+        self.encoder_outputs = self._add_speaker_embedding(self.encoder_outputs,
                                                       speaker_ids)
         mel_outputs, alignments, stop_tokens = self.decoder(
-            encoder_outputs, mel_specs, mask)
+            self.encoder_outputs, mel_specs, mask)
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
         linear_outputs = self.postnet(mel_outputs)
         linear_outputs = self.last_linear(linear_outputs)
