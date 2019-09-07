@@ -30,6 +30,7 @@ from TTS.utils.visual import plot_alignment, plot_spectrogram
 from TTS.datasets.preprocess import get_preprocessor_by_name
 from TTS.utils.radam import RAdam
 from TTS.utils.measures import alignment_diagonal_score
+from TTS.utils.generic_utils import sequence_mask
 
 ## Duration predictor
 from TTS.models.duration_predictor import DurationPredictor, DurationPredictorLoss
@@ -175,6 +176,17 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if not c.separate_stopnet and c.stopnet:
             loss += stop_loss
 
+         ## DURATION MODEL
+        # optimizer_duration.zero_grad()
+        with torch.no_grad():
+            durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
+        duration_pred = model_duration.forward(model.encoder_outputs, ~sequence_mask(text_lengths).to(text_input.device))
+        loss_duration = criterion_duration(duration_pred, durations)
+        loss += loss_duration
+        # loss_duration.backward()
+        # optimizer_duration.step()
+        ## END DURATION MODEL
+
         loss.backward()
         optimizer, current_lr = weight_decay(optimizer, c.wd)
         grad_norm, _ = check_update(model, c.grad_clip)
@@ -189,19 +201,6 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         else:
             grad_norm_st = 0
 
-        ## DURATION MODEL
-        alignment_score = alignment_diagonal_score(alignments)
-        avg_alignment_score += alignment_score
-        optimizer_duration.zero_grad()
-        with torch.no_grad():
-            durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
-        duration_pred = model_duration.forward(model.encoder_outputs.detach())
-        duration_loss = criterion_duration(duration_pred, durations)
-        duration_loss.backward()
-        optimizer_duration.step()
-
-        ## END DURATION MODEL
-        
         step_time = time.time() - start_time
         epoch_time += step_time
 
@@ -511,11 +510,11 @@ def main(args): #pylint: disable=redefined-outer-name
     # duration model
     model_duration = DurationPredictor(256)
     criterion_duration = DurationPredictorLoss()
-    optimizer_duration = RAdam(model_duration.parameters(), lr=0.001)
+    optimizer_duration = None
 
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
 
-    optimizer = RAdam(model.parameters(), lr=c.lr, weight_decay=0)
+    optimizer = RAdam(list(model.parameters()) + list(model_duration.parameters()), lr=c.lr, weight_decay=0)
     if c.stopnet and c.separate_stopnet:
         optimizer_st = RAdam(
             model.decoder.stopnet.parameters(), lr=c.lr, weight_decay=0)
