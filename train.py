@@ -29,6 +29,7 @@ from TTS.utils.text.symbols import phonemes, symbols
 from TTS.utils.visual import plot_alignment, plot_spectrogram
 from TTS.datasets.preprocess import get_preprocessor_by_name
 from TTS.utils.radam import RAdam
+from TTS.utils.measures import alignment_diagonal_score
 
 ## Duration predictor
 from TTS.models.duration_predictor import DurationPredictor, DurationPredictorLoss
@@ -94,9 +95,11 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
     epoch_time = 0
     avg_postnet_loss = 0
     avg_decoder_loss = 0
+    avg_alignment_score = 0
     avg_stop_loss = 0
     avg_step_time = 0
     avg_loader_time = 0
+    avg_duration_loss = 0
     print("\n > Epoch {}/{}".format(epoch, c.epochs), flush=True)
     if use_cuda:
         batch_n_iter = int(len(data_loader.dataset) / (c.batch_size * num_gpus))
@@ -187,12 +190,14 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             grad_norm_st = 0
 
         ## DURATION MODEL
+        alignment_score = alignment_diagonal_score(alignments)
+        avg_alignment_score += alignment_score
         optimizer_duration.zero_grad()
         with torch.no_grad():
             durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
         duration_pred = model_duration.forward(model.encoder_outputs.detach())
-        loss_duration = criterion_duration(duration_pred, durations)
-        loss_duration.backward()
+        duration_loss = criterion_duration(duration_pred, durations)
+        duration_loss.backward()
         optimizer_duration.step()
 
         ## END DURATION MODEL
@@ -203,11 +208,11 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if global_step % c.print_step == 0:
             print(
                 "   | > Step:{}/{}  GlobalStep:{}  TotalLoss:{:.5f}  PostnetLoss:{:.5f}  "
-                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  DurLoss:{:.5f}  GradNorm:{:.5f}  "
+                "DecoderLoss:{:.5f}  StopLoss:{:.5f}  DurLoss:{:.5f}  AlignScore:{:.4}  GradNorm:{:.5f}  "
                 "GradNormST:{:.5f}  AvgTextLen:{:.1f}  AvgSpecLen:{:.1f}  StepTime:{:.2f}  "
                 "LoaderTime:{:.2f}  LR:{:.6f}".format(
                     num_iter, batch_n_iter, global_step, loss.item(),
-                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(), loss_duration.item(),
+                    postnet_loss.item(), decoder_loss.item(), stop_loss.item(), duration_loss.item(), alignment_score.item(),
                     grad_norm, grad_norm_st, avg_text_length, avg_spec_length, step_time,
                     loader_time, current_lr),
                 flush=True)
@@ -222,6 +227,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if args.rank == 0:
             avg_postnet_loss += float(postnet_loss.item())
             avg_decoder_loss += float(decoder_loss.item())
+            avg_duration_loss += float(duration_loss.item())
             avg_stop_loss += stop_loss if isinstance(stop_loss, float) else float(stop_loss.item())
             avg_step_time += step_time
             avg_loader_time += loader_time
@@ -240,7 +246,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             if global_step % c.save_step == 0:
                 if c.checkpoint:
                     # save model
-                    save_checkpoint(model, optimizer, optimizer_st,
+                    save_checkpoint(model, model_duration, optimizer, optimizer_st,
                                     postnet_loss.item(), OUT_PATH, global_step,
                                     epoch)
 
@@ -269,17 +275,20 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
     avg_postnet_loss /= (num_iter + 1)
     avg_decoder_loss /= (num_iter + 1)
     avg_stop_loss /= (num_iter + 1)
+    avg_duration_loss /= (num_iter + 1)
     avg_total_loss = avg_decoder_loss + avg_postnet_loss + avg_stop_loss
     avg_step_time /= (num_iter + 1)
     avg_loader_time /= (num_iter + 1)
+    avg_alignment_score /= (num_iter + 1)
 
     # print epoch stats
     print(
         "   | > EPOCH END -- GlobalStep:{}  AvgTotalLoss:{:.5f}  "
-        "AvgPostnetLoss:{:.5f}  AvgDecoderLoss:{:.5f}  "
+        "AvgPostnetLoss:{:.5f}  AvgDecoderLoss:{:.5f}  AvgDurationLoss:{:.5f}  AvgAlignScore:{:.3f}  "
         "AvgStopLoss:{:.5f}  EpochTime:{:.2f}  "
         "AvgStepTime:{:.2f}  AvgLoaderTime:{:.2f}".format(global_step, avg_total_loss,
-                                                          avg_postnet_loss, avg_decoder_loss,
+                                                          avg_postnet_loss, avg_decoder_loss, 
+                                                          avg_duration_loss, avg_alignment_score,
                                                           avg_stop_loss, epoch_time, avg_step_time,
                                                           avg_loader_time),
         flush=True)
@@ -290,6 +299,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         epoch_stats = {"loss_postnet": avg_postnet_loss,
                        "loss_decoder": avg_decoder_loss,
                        "stop_loss": avg_stop_loss,
+                       "alignment_score": avg_alignment_score,
                        "epoch_time": epoch_time}
         tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
         if c.tb_model_param_stats:
@@ -378,7 +388,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
                 ## DURATION MODEL
                 durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
                 duration_pred = model_duration.forward(model.encoder_outputs.detach())
-                loss_duration = criterion_duration(duration_pred, durations)
+                duration_loss = criterion_duration(duration_pred, durations)
                 ## END DURATION MODEL
 
                 step_time = time.time() - start_time
@@ -390,7 +400,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
                         "StopLoss: {:.5f}  ".format(loss.item(),
                                                     postnet_loss.item(),
                                                     decoder_loss.item(),
-                                                    loss_duration.item(),
+                                                    duration_loss.item(),
                                                     stop_loss.item()),
                         flush=True)
 
@@ -536,6 +546,9 @@ def main(args): #pylint: disable=redefined-outer-name
             model_dict = set_init_dict(model_dict, checkpoint, c)
             model.load_state_dict(model_dict)
             del model_dict
+        if 'model_duration' in checkpoint.keys():
+            print(" > Duration model is restored.")
+            model_duration.load_state_dict(checkpoint['model_duration'])
         for group in optimizer.param_groups:
             group['lr'] = c.lr
         print(
@@ -590,7 +603,7 @@ def main(args): #pylint: disable=redefined-outer-name
         target_loss = train_loss
         if c.run_eval:
             target_loss = val_loss
-        best_loss = save_best_model(model, optimizer, target_loss, best_loss,
+        best_loss = save_best_model(model, model_duration, optimizer, target_loss, best_loss,
                                     OUT_PATH, global_step, epoch)
 
 

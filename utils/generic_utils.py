@@ -108,15 +108,15 @@ def _trim_model_state_dict(state_dict):
     return new_state_dict
 
 
-def save_checkpoint(model, optimizer, optimizer_st, model_loss, out_path,
+def save_checkpoint(model, model_duration, optimizer, optimizer_st, model_loss, out_path,
                     current_step, epoch):
     checkpoint_path = 'checkpoint_{}.pth.tar'.format(current_step)
     checkpoint_path = os.path.join(out_path, checkpoint_path)
     print(" | | > Checkpoint saving : {}".format(checkpoint_path))
 
-    new_state_dict = model.state_dict()
     state = {
-        'model': new_state_dict,
+        'model': model.state_dict(),
+        'model_duration': model_duration.state_dict(), 
         'optimizer': optimizer.state_dict() if optimizer is not None else None,
         'step': current_step,
         'epoch': epoch,
@@ -127,12 +127,12 @@ def save_checkpoint(model, optimizer, optimizer_st, model_loss, out_path,
     torch.save(state, checkpoint_path)
 
 
-def save_best_model(model, optimizer, model_loss, best_loss, out_path,
+def save_best_model(model, model_duration, optimizer, model_loss, best_loss, out_path,
                     current_step, epoch):
     if model_loss < best_loss:
-        new_state_dict = model.state_dict()
         state = {
-            'model': new_state_dict,
+            'model': model.state_dict(),
+            'model_duration': model_duration.state_dict(),
             'optimizer': optimizer.state_dict(),
             'step': current_step,
             'epoch': epoch,

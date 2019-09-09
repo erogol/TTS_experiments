@@ -59,7 +59,7 @@
     "wd": 0.000001,         // Weight decay weight.
     "checkpoint": true,     // If true, it saves checkpoints per "save_step"
     "save_step": 10000,      // Number of training steps expected to save traning stats and checkpoints.
-    "print_step": 25,       // Number of steps to log traning on console.
+    "print_step": 100,       // Numberi of steps to log traning on console.
     "batch_group_size": 0,  //Number of batches to shuffle after bucketing.
 
     "run_eval": true,
