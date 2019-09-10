@@ -55,11 +55,11 @@ class Tacotron(nn.Module):
     def inference(self, characters, speaker_ids=None):
         B = characters.size(0)
         inputs = self.embedding(characters)
-        encoder_outputs = self.encoder(inputs)
-        encoder_outputs = self._add_speaker_embedding(encoder_outputs,
+        self.encoder_outputs = self.encoder(inputs)
+        self.encoder_outputs = self._add_speaker_embedding(self.encoder_outputs,
                                                       speaker_ids)
         mel_outputs, alignments, stop_tokens = self.decoder.inference(
-            encoder_outputs)
+            self.encoder_outputs)
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
         linear_outputs = self.postnet(mel_outputs)
         linear_outputs = self.last_linear(linear_outputs)
