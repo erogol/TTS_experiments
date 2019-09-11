@@ -181,9 +181,9 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         with torch.no_grad():
             durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
         duration_pred = model_duration.forward(model.encoder_outputs, ~sequence_mask(text_lengths).to(text_input.device))
-        loss_duration = criterion_duration(duration_pred, durations)
-        loss += loss_duration
-        # loss_duration.backward()
+        duration_loss = criterion_duration(duration_pred, durations)
+        loss += duration_loss
+        # duration_loss.backward()
         # optimizer_duration.step()
         ## END DURATION MODEL
 
@@ -191,6 +191,9 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         optimizer, current_lr = weight_decay(optimizer, c.wd)
         grad_norm, _ = check_update(model, c.grad_clip)
         optimizer.step()
+
+        # compute alignment score
+        alignment_score = alignment_diagonal_score(alignments)
 
         # backpass and check the grad norm for stop loss
         if c.separate_stopnet:
