@@ -1,5 +1,5 @@
 {
-    "tts_path":"/media/erogol/data_ssd/Models/libri_tts/5049/",  // tts model root folder
+    "tts_path":"/media/erogol/data_ssd/Models/turkish/turkish-August-23-2019_07+02PM-31d0231/",  // tts model root folder
     "tts_file":"best_model.pth.tar",     // tts checkpoint file
     "tts_config":"config.json",     // tts config.json file
     "tts_speakers": null,           // json file listing speaker ids. null if no speaker embedding.
@@ -9,6 +9,6 @@
     "wavernn_config": null, // wavernn config file
     "is_wavernn_batched":true, 
     "port": 5002,
-    "use_cuda": true,
-    "debug": true
+    "use_cuda": false,
+    "debug": false
 }
