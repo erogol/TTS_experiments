@@ -65,6 +65,23 @@ class Tacotron(nn.Module):
         linear_outputs = self.last_linear(linear_outputs)
         return mel_outputs, linear_outputs, alignments, stop_tokens
 
+    def inference_duration(self, characters, model_duration, speaker_ids=None):
+        B = characters.size(0)
+        inputs = self.embedding(characters)
+        self.encoder_outputs = self.encoder(inputs)
+        self.encoder_outputs = self._add_speaker_embedding(self.encoder_outputs,
+                                                      speaker_ids)
+        pred = model_duration.inference(self.encoder_outputs)
+        alignments = model_duration.compute_alignment(pred[0])
+        context = model_duration.length_regulation(self.encoder_outputs[0], pred[0])
+        mel_outputs = self.decoder.inference_duration(inputs,
+            context)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+        alignments = alignments.T[None, :]
+        return mel_outputs, linear_outputs, alignments
+
     def _add_speaker_embedding(self, encoder_outputs, speaker_ids):
         if hasattr(self, "speaker_embedding") and speaker_ids is None:
             raise RuntimeError(" [!] Model has speaker embedding layer but speaker_id is not provided")

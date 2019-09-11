@@ -392,6 +392,36 @@ class Decoder(nn.Module):
         output = output[:, : self.r * self.memory_dim]
         return output, stop_token, self.attention.attention_weights
 
+    def decode_duration(self, mask=None):
+        processed_memory = self.prenet(self.memory_input)
+        # Attention RNN
+        self.attention_rnn_hidden = self.attention_rnn(
+            torch.cat((processed_memory, self.context_vec), -1),
+            self.attention_rnn_hidden)
+        # Concat RNN output and attention context vector
+        decoder_input = self.project_to_decoder_in(
+            torch.cat((self.attention_rnn_hidden, self.context_vec), -1))
+
+        # Pass through the decoder RNNs
+        for idx in range(len(self.decoder_rnns)):
+            self.decoder_rnn_hiddens[idx] = self.decoder_rnns[idx](
+                decoder_input, self.decoder_rnn_hiddens[idx])
+            # Residual connection
+            decoder_input = self.decoder_rnn_hiddens[idx] + decoder_input
+        decoder_output = decoder_input
+
+        # predict mel vectors from decoder vectors
+        output = self.proj_to_mel(decoder_output)
+        # output = torch.sigmoid(output)
+        # predict stop token
+        stopnet_input = torch.cat([decoder_output, output], -1)
+        if self.separate_stopnet:
+            stop_token = self.stopnet(stopnet_input.detach())
+        else:
+            stop_token = self.stopnet(stopnet_input)
+        output = output[:, : self.r * self.memory_dim]
+        return output
+
     def _update_memory_input(self, new_memory):
         if self.use_memory_queue:
             if self.memory_size > self.r:
@@ -472,6 +502,29 @@ class Decoder(nn.Module):
                 print("   | > Decoder stopped with 'max_decoder_steps")
                 break
         return self._parse_outputs(outputs, attentions, stop_tokens)
+
+
+    def inference_duration(self, inputs, context):
+        """
+        Args:
+            inputs: Encoder outputs.
+
+        Shapes:
+            - inputs: batch x time x encoder_out_dim
+        """
+        outputs = []
+        t = 0
+        self._init_states(inputs)
+        while t < context.shape[0]:
+            if t > 0:
+                new_memory = outputs[-1]
+                self._update_memory_input(new_memory)
+            self.context_vec = context[t].unsqueeze(0)
+            output = self.decode_duration(None)
+            outputs += [output]
+            t += 1
+        outputs = torch.stack(outputs).transpose(0, 1).contiguous()
+        return outputs
 
 
 class StopNet(nn.Module):

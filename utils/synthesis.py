@@ -116,3 +116,55 @@ def synthesis(model,
     if do_trim_silence:
         wav = trim_silence(wav, ap)
     return wav, alignment, decoder_output, postnet_output, stop_tokens
+
+
+def synthesis_duration(model,
+                       model_duration,
+              text,
+              CONFIG,
+              use_cuda,
+              ap,
+              speaker_id=None,
+              style_wav=None,
+              truncated=False,
+              enable_eos_bos_chars=False, #pylint: disable=unused-argument
+              do_trim_silence=False):
+    """Synthesize voice for the given text.
+
+        Args:
+            model (TTS.models): model to synthesize.
+            text (str): target text
+            CONFIG (dict): config dictionary to be loaded from config.json.
+            use_cuda (bool): enable cuda.
+            ap (TTS.utils.audio.AudioProcessor): audio processor to process
+                model outputs.
+            speaker_id (int): id of speaker
+            style_wav (str): Uses for style embedding of GST.
+            truncated (bool): keep model states after inference. It can be used
+                for continuous inference at long texts.
+            enable_eos_bos_chars (bool): enable special chars for end of sentence and start of sentence.
+            do_trim_silence (bool): trim silence after synthesis.
+    """
+    # GST processing
+    style_mel = None
+    if CONFIG.model == "TacotronGST" and style_wav is not None:
+        style_mel = compute_style_mel(style_wav, ap, use_cuda)
+    # preprocess the given text
+    inputs = text_to_seqvec(text, CONFIG, use_cuda)
+    speaker_id = id_to_torch(speaker_id)
+    if speaker_id is not None and use_cuda:
+        speaker_id = speaker_id.cuda()
+    # synthesize voice
+    decoder_output, postnet_output, alignments = model.inference_duration(
+                inputs, model_duration, speaker_ids=speaker_id)
+    # convert outputs to numpy
+    postnet_output, decoder_output, alignment = parse_outputs(
+        postnet_output, decoder_output, alignments)
+    # plot results
+    wav = inv_spectrogram(postnet_output, ap, CONFIG)
+    # trim silence
+    if do_trim_silence:
+        wav = trim_silence(wav, ap)
+    return wav, alignments, decoder_output, postnet_output
+
+

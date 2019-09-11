@@ -60,9 +60,10 @@ def visualize(alignment, spectrogram_postnet, stop_tokens, text, hop_length, CON
     plt.yticks(range(len(text)), list(text))
     plt.colorbar()
 
-    stop_tokens = stop_tokens.squeeze().detach().to('cpu').numpy()
-    plt.subplot(num_plot, 1, 2)
-    plt.plot(range(len(stop_tokens)), list(stop_tokens))
+    if stop_tokens is not None:
+        stop_tokens = stop_tokens.squeeze().detach().to('cpu').numpy()
+        plt.subplot(num_plot, 1, 2)
+        plt.plot(range(len(stop_tokens)), list(stop_tokens))
 
     plt.subplot(num_plot, 1, 3)
     librosa.display.specshow(spectrogram_postnet.T, sr=CONFIG.audio['sample_rate'],
