@@ -33,7 +33,7 @@ from TTS.utils.measures import alignment_diagonal_score
 from TTS.utils.generic_utils import sequence_mask
 
 ## Duration predictor
-from TTS.models.duration_predictor import DurationPredictor, DurationPredictorLoss
+from TTS.models.duration_predictor import DurationPredictor, gaussian_loss
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -180,7 +180,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         # optimizer_duration.zero_grad()
         with torch.no_grad():
             durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
-        duration_pred = model_duration.forward(model.encoder_outputs, ~sequence_mask(text_lengths).to(text_input.device))
+        duration_pred = model_duration.forward(model.encoder_outputs,)
         duration_loss = criterion_duration(duration_pred, durations)
         loss += duration_loss
         # duration_loss.backward()
@@ -512,7 +512,7 @@ def main(args): #pylint: disable=redefined-outer-name
 
     # duration model
     model_duration = DurationPredictor(256)
-    criterion_duration = DurationPredictorLoss()
+    criterion_duration = gaussian_loss
     optimizer_duration = None
 
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
@@ -550,7 +550,7 @@ def main(args): #pylint: disable=redefined-outer-name
             del model_dict
         if 'model_duration' in checkpoint.keys():
             print(" > Duration model is restored.")
-            model_duration.load_state_dict(checkpoint['model_duration'])
+#             model_duration.load_state_dict(checkpoint['model_duration'])
         for group in optimizer.param_groups:
             group['lr'] = c.lr
         print(
@@ -563,7 +563,6 @@ def main(args): #pylint: disable=redefined-outer-name
         model = model.cuda()
         criterion.cuda()
         model_duration = model_duration.cuda()
-        criterion_duration = criterion_duration.cuda()
         if criterion_st:
             criterion_st.cuda()
 
