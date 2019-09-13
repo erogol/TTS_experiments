@@ -39,6 +39,8 @@ class Synthesizer(object):
         print(" | > model config: ", tts_config)
         print(" | > checkpoint file: ", tts_checkpoint)
         self.tts_config = load_config(tts_config)
+        self.tts_config.use_forward_attn = True
+
         self.use_phonemes = self.tts_config.use_phonemes
         self.ap = AudioProcessor(**self.tts_config.audio)
         if self.use_phonemes:
@@ -139,12 +141,12 @@ class Synthesizer(object):
         print(sens)
         if not sens:
             sens = [text+'.']
-        for sen in sens:
+        for idx, sen in enumerate(sens):
             # preprocess the given text
             inputs = text_to_seqvec(sen, self.tts_config, self.use_cuda)
             # synthesize voice
             decoder_output, postnet_output, alignments, _ = run_model(
-                self.tts_model, inputs, self.tts_config, False, None, None)
+                self.tts_model, inputs, self.tts_config, False, None, None, skip_init=idx>0)
             # convert outputs to numpy
             postnet_output, decoder_output, _ = parse_outputs(
                 postnet_output, decoder_output, alignments)
@@ -158,7 +160,7 @@ class Synthesizer(object):
             wav = trim_silence(wav, self.ap)
 
             wavs += list(wav)
-            wavs += [0] * 10000
+            wavs += [0] * 5000
 
         out = io.BytesIO()
         self.save_wav(wavs, out)
