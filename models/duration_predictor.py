@@ -1,6 +1,7 @@
 import torch
 import math
 from torch.distributions.normal import Normal
+from torch.nn import functional as F
 from TTS.utils.data import pad_list
 
 class LayerNorm(torch.nn.LayerNorm):
@@ -55,7 +56,7 @@ class DurationPredictor(torch.nn.Module):
                 LayerNorm(n_chans, dim=1),
                 torch.nn.Dropout(dropout_rate)
             )]
-        self.linear = torch.nn.Linear(n_chans, 2)
+        self.linear = torch.nn.Linear(n_chans, 5)
 
     def calculate_durations(self, att_ws, ilens, olens):
         durations = [self._calculate_duration(att_w, ilen, olen) for att_w, ilen, olen in zip(att_ws, ilens, olens)]
@@ -72,7 +73,7 @@ class DurationPredictor(torch.nn.Module):
 
         # NOTE: calculate in log domain
         xs = self.linear(xs.transpose(1, -1)).squeeze(-1)  # (B, Tmax)
-
+        xs = F.softmax(xs)
         if is_inference:
             # NOTE: calculate in linear domain
             xs = sample_from_gaussian(xs)
@@ -129,25 +130,15 @@ class DurationPredictor(torch.nn.Module):
         a_vals = torch.stack(a_vals)
         return a_vals
 
-def sample_from_gaussian(y_hat, log_std_min=-7.0, scale_factor=1.0):
-    assert y_hat.size(2) == 2
-    mean = y_hat[:, :, :1]
-    log_std = torch.clamp(y_hat[:, :, 1:], min=log_std_min)
-    dist = Normal(mean, torch.exp(log_std), )
-    sample = dist.sample()
-    sample = torch.clamp(sample, min=0)
-    del dist
-    return sample
-
         
-def gaussian_loss(y_hat, y, log_std_min=-7.0):
-    assert y_hat.dim() == 3
-    assert y_hat.size(2) == 2
-    mean = y_hat[:, :, :1].squeeze(-1)
-    log_std = torch.clamp(y_hat[:, :, 1:], min=log_std_min).squeeze(-1)
-    # TODO: replace with pytorch dist
-    log_probs = -0.5 * (- math.log(2.0 * math.pi) - 2. * log_std - torch.pow(y.float() - mean, 2) * torch.exp((-2.0 * log_std)))
-    return log_probs.squeeze().mean()
+def discrete_loss(y_hat, y, log_std_min=-7.0):
+    y = torch.clamp(y, max=4)
+    loss = F.cross_entropy(y_hat.view(y_hat.shape[0] * y_hat.shape[1], y_hat.shape[2]), y.view(y.shape[0] * y.shape[1]))
+    # b = torch.zeros(y_hat.shape[0], y_hat.shape[1], 5).to(y_hat.device)
+    # b[:] = torch.FloatTensor(list(range(5)))
+    # y_hat = (y_hat * b).sum(-1)
+    # loss = F.l1_loss(y_hat, y.float())
+    return loss
 
 
 class DurationPredictorLoss(torch.nn.Module):

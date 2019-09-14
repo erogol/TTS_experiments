@@ -33,7 +33,7 @@ from TTS.utils.measures import alignment_diagonal_score
 from TTS.utils.generic_utils import sequence_mask
 
 ## Duration predictor
-from TTS.models.duration_predictor import DurationPredictor, gaussian_loss
+from TTS.models.duration_predictor import DurationPredictor, discrete_loss
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -512,7 +512,7 @@ def main(args): #pylint: disable=redefined-outer-name
 
     # duration model
     model_duration = DurationPredictor(256)
-    criterion_duration = gaussian_loss
+    criterion_duration = discrete_loss
     optimizer_duration = None
 
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
