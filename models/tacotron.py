@@ -66,6 +66,10 @@ class Tacotron(nn.Module):
         return mel_outputs, linear_outputs, alignments, stop_tokens
 
     def inference_duration(self, characters, model_duration, speaker_ids=None):
+        """
+        TODO: maybe the encoder is useless, especially for phoneme training. If you connect
+        'inputs' directly to 'decoder', it still works fine.
+        """
         B = characters.size(0)
         inputs = self.embedding(characters)
         self.encoder_outputs = self.encoder(inputs)
@@ -74,7 +78,7 @@ class Tacotron(nn.Module):
         pred = model_duration.inference(self.encoder_outputs)
         alignments = model_duration.compute_alignment(pred[0])
         context = model_duration.length_regulation(self.encoder_outputs[0], pred[0])
-        mel_outputs = self.decoder.inference_duration(inputs,
+        mel_outputs = self.decoder.inference_duration(self.encoder_outputs,
             context)
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
         linear_outputs = self.postnet(mel_outputs)

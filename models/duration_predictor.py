@@ -72,11 +72,14 @@ class DurationPredictor(torch.nn.Module):
             xs = f(xs)  # (B, C, Tmax)
 
         # NOTE: calculate in log domain
-        xs = self.linear(xs.transpose(1, -1)).squeeze(-1)  # (B, Tmax)
-        xs = F.softmax(xs)
+        xs = self.linear(xs.transpose(1, -1)).squeeze(-1)  # (B, Tmax, 5)
         if is_inference:
             # NOTE: calculate in linear domain
-            xs = sample_from_gaussian(xs)
+            xs = F.softmax(xs, dim=-1)
+            b = torch.zeros(xs.shape[0], xs.shape[1], 5).to(xs.device)
+            b[:] = torch.FloatTensor(list(range(5)))
+            xs = (xs * b).sum(-1) + 0.5
+            # xs = xs.argmax(dim=-1)
 #             xs = torch.clamp(xs[:, :, 0], min=0)
 #             xs = torch.clamp(torch.round(xs.exp() - self.offset), min=0).long()  # avoid negative value
 

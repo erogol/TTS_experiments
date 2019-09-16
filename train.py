@@ -194,6 +194,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
 
         # compute alignment score
         alignment_score = alignment_diagonal_score(alignments)
+        avg_alignment_score = alignment_score
 
         # backpass and check the grad norm for stop loss
         if c.separate_stopnet:
@@ -302,6 +303,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
                        "loss_decoder": avg_decoder_loss,
                        "stop_loss": avg_stop_loss,
                        "alignment_score": avg_alignment_score,
+                       "duration_loss": avg_duration_loss,
                        "epoch_time": epoch_time}
         tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
         if c.tb_model_param_stats:
@@ -415,6 +417,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
 
                 avg_postnet_loss += float(postnet_loss.item())
                 avg_decoder_loss += float(decoder_loss.item())
+                avg_duration_loss += float(duration_loss.item())
                 avg_stop_loss += stop_loss.item()
 
             if args.rank == 0:
@@ -446,6 +449,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
                 # Plot Validation Stats
                 epoch_stats = {"loss_postnet": avg_postnet_loss,
                                "loss_decoder": avg_decoder_loss,
+                               "loss_duration": avg_duration_loss,
                                "stop_loss": avg_stop_loss}
                 tb_logger.tb_eval_stats(global_step, epoch_stats)
 
