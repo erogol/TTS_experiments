@@ -144,16 +144,16 @@ class DurationPredictor(torch.nn.Module):
                 a[idx] = 1
             else:
                 for i in range(dur):
-                    a[idx] = scores[idx, i]
-                    if idx + 2 < durations.shape[0]:
-                        a[idx + 1] = 1 - scores[idx + 1, 0]
+                    a[idx, :] = scores[idx, i]
+                    if i + 1 == dur and idx + 2 < durations.shape[0]:
+                        a[idx + 1, -1] = 1 - scores[idx + 1, 0]
             a_vals.append(a)
         a_vals = torch.cat(a_vals, dim=-1)
         return a_vals
 
     def length_regulation(self, x, durations, scores=None):
         # breakpoint()
-        scores = torch.clamp(scores, min=0.1, max=0.8)
+        scores = torch.clamp(scores, min=0.3, max=0.99)
         T_en = durations.shape[0]
         a_vals = []
         # durations *= 1.05
@@ -165,8 +165,8 @@ class DurationPredictor(torch.nn.Module):
                 a_vals += [x[idx]] * dur 
             else:
                 for i in range(dur):
-                    if idx + 2 < durations.shape[0]:
-                        a_vals += [x[idx] * scores[idx, i] + x[idx + 1] * (1-scores[idx, i])]
+                    if i+1 == dur and idx + 2 < durations.shape[0]:
+                        a_vals += [x[idx] * scores[idx, i] + x[idx + 1] * scores[idx+1, 0]]
                     else:
                         a_vals += [x[idx] * scores[idx, i]]
         a_vals = torch.stack(a_vals)
