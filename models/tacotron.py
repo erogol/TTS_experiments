@@ -75,9 +75,9 @@ class Tacotron(nn.Module):
         self.encoder_outputs = self.encoder(inputs)
         self.encoder_outputs = self._add_speaker_embedding(self.encoder_outputs,
                                                       speaker_ids)
-        pred = model_duration.inference(self.encoder_outputs)
-        alignments = model_duration.compute_alignment(pred[0])
-        context = model_duration.length_regulation(self.encoder_outputs[0], pred[0])
+        pred, score = model_duration.inference(self.encoder_outputs)
+        alignments = model_duration.compute_alignment(pred[0], score[0])
+        context = model_duration.length_regulation(self.encoder_outputs[0], pred[0], score[0])
         mel_outputs = self.decoder.inference_duration(self.encoder_outputs,
             context)
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)

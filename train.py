@@ -33,7 +33,7 @@ from TTS.utils.measures import alignment_diagonal_score
 from TTS.utils.generic_utils import sequence_mask
 
 ## Duration predictor
-from TTS.models.duration_predictor import DurationPredictor, discrete_loss
+from TTS.models.duration_predictor import DurationPredictor, DurationLoss
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = False
@@ -180,8 +180,9 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         # optimizer_duration.zero_grad()
         with torch.no_grad():
             durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
-        duration_pred = model_duration.forward(model.encoder_outputs,)
-        duration_loss = criterion_duration(duration_pred, durations)
+            scores = model_duration.calculate_scores(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
+        duration_pred, scores_pred = model_duration.forward(model.encoder_outputs,)
+        duration_loss = criterion_duration(duration_pred, durations, scores_pred, scores)
         loss += duration_loss
         # duration_loss.backward()
         # optimizer_duration.step()
@@ -320,6 +321,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
     avg_postnet_loss = 0
     avg_decoder_loss = 0
     avg_stop_loss = 0
+    avg_duration_loss = 0
     print("\n > Validation")
     if c.test_sentences_file is None:
         test_sentences = [
@@ -391,8 +393,9 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch, model_durat
 
                 ## DURATION MODEL
                 durations = model_duration.calculate_durations(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
-                duration_pred = model_duration.forward(model.encoder_outputs.detach())
-                duration_loss = criterion_duration(duration_pred, durations)
+                scores = model_duration.calculate_scores(alignments.detach(), text_lengths.detach().cpu().numpy(), mel_lengths.detach().cpu().numpy())
+                duration_pred, scores_pred = model_duration.forward(model.encoder_outputs.detach())
+                duration_loss = criterion_duration(duration_pred, durations, scores_pred, scores)
                 ## END DURATION MODEL
 
                 step_time = time.time() - start_time
@@ -516,7 +519,7 @@ def main(args): #pylint: disable=redefined-outer-name
 
     # duration model
     model_duration = DurationPredictor(256)
-    criterion_duration = discrete_loss
+    criterion_duration = DurationLoss()
     optimizer_duration = None
 
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
