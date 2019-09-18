@@ -45,7 +45,7 @@ class DurationPredictor(torch.nn.Module):
             dropout_rate (float, optional): Dropout rate.
             offset (float, optional): Offset value to avoid nan in log domain.
         """
-        super(DurationPredictor, self).__init__()
+        super().__init__()
         self.offset = offset
         self.k = 5
         self.conv = torch.nn.ModuleList()
@@ -97,10 +97,10 @@ class DurationPredictor(torch.nn.Module):
         if is_inference:
             # NOTE: calculate in linear domain
             durs = F.softmax(durs, dim=-1)
-            b = torch.zeros(durs.shape[0], durs.shape[1], 5).to(durs.device)
-            b[:] = torch.FloatTensor(list(range(5)))
-            durs = (durs * b).sum(-1)
-            # durs = durs.argmax(-1)
+            # b = torch.zeros(durs.shape[0], durs.shape[1], 5).to(durs.device)
+            # b[:] = torch.FloatTensor(list(range(5)))
+            # durs = (durs * b).sum(-1)
+            durs = durs.argmax(-1)
         
         # compute attention scores
         scores = self.linear2(xs.transpose(1, -1).squeeze(-1))
@@ -145,6 +145,8 @@ class DurationPredictor(torch.nn.Module):
             else:
                 for i in range(dur):
                     a[idx] = scores[idx, i]
+                    if idx + 2 < durations.shape[0]:
+                        a[idx + 1] = 1 - scores[idx + 1, 0]
             a_vals.append(a)
         a_vals = torch.cat(a_vals, dim=-1)
         return a_vals
@@ -154,7 +156,7 @@ class DurationPredictor(torch.nn.Module):
         scores = torch.clamp(scores, min=0.1, max=0.8)
         T_en = durations.shape[0]
         a_vals = []
-        durations *= 1.05
+        # durations *= 1.05
         for idx, dur in enumerate(durations.squeeze().long()):
             dur = dur.item()
             if dur == 0:
@@ -163,7 +165,7 @@ class DurationPredictor(torch.nn.Module):
                 a_vals += [x[idx]] * dur 
             else:
                 for i in range(dur):
-                    if i + 1 == dur and idx + 2 < durations.shape[0]:
+                    if idx + 2 < durations.shape[0]:
                         a_vals += [x[idx] * scores[idx, i] + x[idx + 1] * (1-scores[idx, i])]
                     else:
                         a_vals += [x[idx] * scores[idx, i]]
