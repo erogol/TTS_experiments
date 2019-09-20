@@ -525,7 +525,7 @@ def main(args): #pylint: disable=redefined-outer-name
 
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
 
-    optimizer = RAdam(list(model.parameters()) + list(model_duration.parameters()), lr=c.lr, weight_decay=0)
+    optimizer = RAdam(list(model.decoder.parameters()) + list(model.postnet.parameters()) + list(model.last_linear.parameters()), lr=c.lr, weight_decay=0)
     if c.stopnet and c.separate_stopnet:
         optimizer_st = RAdam(
             model.decoder.stopnet.parameters(), lr=c.lr, weight_decay=0)
