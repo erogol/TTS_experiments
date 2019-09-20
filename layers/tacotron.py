@@ -488,13 +488,8 @@ class Decoder(nn.Module):
         memory_size = int(memory.shape[1] * factor)
         memory_size -= memory_size % self.r
         memory = torch.nn.functional.interpolate(memory.transpose(1, 2), size=memory_size).transpose(1, 2)
-        try:
-            memory = self._reshape_memory(memory)
-        except:
-            breakpoint()
+        memory = self._reshape_memory(memory)
         outputs = []
-        attentions = []
-        stop_tokens = []
         t = 0
         self._init_states(inputs)
         self.attention.init_states(inputs)

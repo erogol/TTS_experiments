@@ -135,7 +135,7 @@ class DurationPredictor(torch.nn.Module):
     def compute_alignment_batch(self, durations, scores):
         alignment = [self.compute_alignment(dur, sco).T for dur, sco in zip(durations, scores)]
         alignment = pad_list(alignment, 0)
-        return alignment.T
+        return alignment
 
     def compute_alignment(self, durations, scores=None):
         T_en = durations.shape[0]
