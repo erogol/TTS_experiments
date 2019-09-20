@@ -470,6 +470,45 @@ class Decoder(nn.Module):
 
         return self._parse_outputs(outputs, attentions, stop_tokens)
 
+    def forward_duration(self, inputs, memory, context, mask):
+        """
+        Args:
+            inputs: Encoder outputs.
+            memory: Decoder memory (autoregression. If None (at eval-time),
+              decoder outputs are used as decoder inputs. If None, it uses the last
+              output as the input.
+            mask: Attention mask for sequence padding.
+
+        Shapes:
+            - inputs: batch x time x encoder_out_dim
+            - memory: batch x #mel_specs x mel_spec_dim
+        """
+        # Run greedy decoding if memory is None
+        factor = context.shape[1] / (memory.shape[1] / self.r)
+        memory_size = int(memory.shape[1] * factor)
+        memory_size -= memory_size % self.r
+        memory = torch.nn.functional.interpolate(memory.transpose(1, 2), size=memory_size).transpose(1, 2)
+        try:
+            memory = self._reshape_memory(memory)
+        except:
+            breakpoint()
+        outputs = []
+        attentions = []
+        stop_tokens = []
+        t = 0
+        self._init_states(inputs)
+        self.attention.init_states(inputs)
+        while len(outputs) < memory.size(0):
+            if t > 0:
+                new_memory = memory[t - 1]
+                self._update_memory_input(new_memory)
+            self.context_vec = context[:, t, :]
+            output = self.decode_duration(mask)
+            outputs += [output]
+            t += 1
+        outputs = torch.stack(outputs).transpose(0, 1).contiguous()
+        return outputs, memory_size
+
     def inference(self, inputs):
         """
         Args:
@@ -538,7 +577,7 @@ class StopNet(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.linear = nn.Linear(in_features, 1)
         torch.nn.init.xavier_uniform_(
-            self.linear.weight, gain=torch.nn.init.calculate_gain('linear'))
+        self.linear.weight, gain=torch.nn.init.calculate_gain('linear'))
 
     def forward(self, inputs):
         outputs = self.dropout(inputs)

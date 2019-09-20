@@ -52,6 +52,24 @@ class Tacotron(nn.Module):
         linear_outputs = self.last_linear(linear_outputs)
         return mel_outputs, linear_outputs, alignments, stop_tokens
 
+    def forward_duration(self, characters, text_lengths, mel_specs, model_duration, speaker_ids=None):
+        B = characters.size(0)
+        mask = sequence_mask(text_lengths).to(characters.device)
+        inputs = self.embedding(characters)
+        self.encoder_outputs = self.encoder(inputs)
+        self.encoder_outputs = self._add_speaker_embedding(self.encoder_outputs,
+                                                      speaker_ids)
+        pred, score = model_duration.forward(self.encoder_outputs)
+        pred = pred.argmax(-1)
+        alignments = model_duration.compute_alignment_batch(pred, score)
+        context = model_duration.length_regulation_batch(self.encoder_outputs, pred, score)
+        mel_outputs, scale_factor = self.decoder.forward_duration(
+            self.encoder_outputs, mel_specs, context, mask)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+        return mel_outputs, linear_outputs, alignments, scale_factor
+
     def inference(self, characters, speaker_ids=None):
         B = characters.size(0)
         inputs = self.embedding(characters)

@@ -132,6 +132,11 @@ class DurationPredictor(torch.nn.Module):
         """
         return self._forward(xs, x_masks, True)
     
+    def compute_alignment_batch(self, durations, scores):
+        alignment = [self.compute_alignment(dur, sco).T for dur, sco in zip(durations, scores)]
+        alignment = pad_list(alignment, 0)
+        return alignment.T
+
     def compute_alignment(self, durations, scores=None):
         T_en = durations.shape[0]
         a_vals = []
@@ -150,6 +155,11 @@ class DurationPredictor(torch.nn.Module):
             a_vals.append(a)
         a_vals = torch.cat(a_vals, dim=-1)
         return a_vals
+
+    def length_regulation_batch(self, xs, durations, scores):
+        context = [self.length_regulation(x, dur, sco) for x, dur, sco in zip(xs, durations, scores)]
+        context = pad_list(context, 0)
+        return context
 
     def length_regulation(self, x, durations, scores=None):
         # breakpoint()
