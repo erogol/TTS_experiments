@@ -6,11 +6,15 @@
 =======
     "run_name": "turkish",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "run_description": "turkish female model",
 >>>>>>> turkish updates
 =======
     "run_description": "turkish female model wıth chars",
 >>>>>>> turkish chars
+=======
+    "run_description": "turkish female model wıth chars after memory fix.",
+>>>>>>> config update
 
     // AUDIO PARAMETERS
     "audio":{
@@ -149,7 +153,7 @@
                 "meta_file_val": "metadata_val.csv"
 =======
                 "name": "custom_turkish",
-                "path": "/home/erogol/projects/turkish/",
+                "path": "/home/erogol/projects/turkish/turkish_female/",
                 "meta_file_train": "turkish_train.csv",
                 "meta_file_val": "turkish_eval.csv"
 >>>>>>> turkish updates
