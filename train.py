@@ -300,7 +300,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
                                           {'TrainAudio': train_audio},
                                           c.audio["sample_rate"])
         end_time = time.time()
-
+        torch.cuda.empty_cache()
     # print epoch stats
     print("   | > EPOCH END -- GlobalStep:{}  "
           "AvgPostnetLoss:{:.5f}  AvgDecoderLoss:{:.5f}  "
