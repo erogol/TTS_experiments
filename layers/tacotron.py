@@ -439,7 +439,7 @@ class Decoder(nn.Module):
             t += 1
         return self._parse_outputs(outputs, attentions, stop_tokens)
 
-    def inference(self, inputs, skip_init=False):
+    def inference(self, inputs, speaker_embeddings=None, skip_init=False):
         """
         Args:
             inputs: encoder outputs.
