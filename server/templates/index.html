@@ -1,49 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 
-  <head>
+<head>
 
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="">
-    <meta name="author" content="">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
 
-    <title>Turkish Text to Speech Demo</title>
+  <title>Turkish Text to Speech Demo</title>
 
-    <!-- Bootstrap core CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" 
-     integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous" rel="stylesheet">
+  <!-- Bootstrap core CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css"
+    integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous"
+    rel="stylesheet">
 
-    <!-- Custom styles for this template -->
-    <style>
+  <!-- Custom styles for this template -->
+  <style>
+    body {
+      padding-top: 54px;
+    }
+
+    @media (min-width: 992px) {
       body {
-        padding-top: 54px;
+        padding-top: 56px;
       }
-      @media (min-width: 992px) {
-        body {
-          padding-top: 56px;
-        }
-      }
+    }
 
-    </style>
-  </head>
-  
-  <body>
+    textarea {
+      border: 0 none white;
+      overflow: hidden;
+      padding: 0;
+      outline: none;
+      background-color: #D0D0D0;
+    }
+  </style>
+</head>
 
-    <!-- Page Content -->
-    <div class="container">
-      <div class="row">
-        <div class="col-lg-12 text-center">
-          <!-- <img class="mt-5" src="https://user-images.githubusercontent.com/1402048/52643646-c2102980-2edd-11e9-8c37-b72f3c89a640.png" alt=></img> -->
-          <ul class="list-unstyled">
-          </ul>
-          <input id="text" placeholder="Type here..." size=45 type="text" name="text"> 
-          <button id="speak-button" name="speak">Speak</button><br/><br/>
-          <audio id="audio" controls autoplay hidden></audio>
-          <p id="message"></p>
-        </div>
+<body onload="init();">
+
+  <!-- Page Content -->
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 text-center">
+        <!-- <img class="mt-5" src="https://user-images.githubusercontent.com/1402048/52643646-c2102980-2edd-11e9-8c37-b72f3c89a640.png" alt=></img> -->
+        <ul class="list-unstyled">
+        </ul>
+        <textarea id="text" placeholder="Type here..." size=45 type="text" name="text" id="text"></textarea><br /><br />
+        <button id="speak-button" name="speak">Speak</button><br /><br />
+        <audio id="audio" controls autoplay hidden></audio>
+        <p id="message"></p>
       </div>
     </div>
+  </div>
 
     <!-- Bootstrap core JavaScript -->
     <script>
@@ -83,6 +92,6 @@
             }
         </script>
 
-  </body>
+</body>
 
 </html>

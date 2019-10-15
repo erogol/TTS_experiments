@@ -1,8 +1,9 @@
 {
     "tts_path":"/media/erogol/data_ssd/Models/turkish/turkish-August-23-2019_07+02PM-31d0231/",  // tts model root folder
+    // "tts_path":"/media/erogol/data_ssd/Models/libri_tts/turkish-October-02-2019_03+28PM-d365910",
     "tts_file":"best_model.pth.tar",     // tts checkpoint file
     "tts_config":"config.json",     // tts config.json file
-    "tts_speakers": null,           // json file listing speaker ids. null if no speaker embedding.
+    "tts_speakers": null,           // json file listing speaker ids. null if no speaker embed<ing.
     "wavernn_lib_path": null,   // Rootpath to wavernn project folder to be imported. If this is null, model uses GL for speech synthesis.
     "wavernn_path":null,  // wavernn model root path
     "wavernn_file":null, // wavernn checkpoint file name
