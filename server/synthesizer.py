@@ -159,13 +159,9 @@ class Synthesizer(object):
         wavs = []
         sens = self.split_into_sentences(text)
         print(sens)
-<<<<<<< HEAD
-        for sen in sens:
-=======
         if not sens:
             sens = [text+'.']
         for idx, sen in enumerate(sens):
->>>>>>> use forward_attn and skip init for truncated inferencewddewfwf
             # preprocess the given text
             inputs = text_to_seqvec(sen, self.tts_config, self.use_cuda)
             # synthesize voice
