@@ -347,9 +347,13 @@ def split_dataset(items):
 
 
 def gradual_training_scheduler(global_step, config):
+    num_gpus = torch.cuda.device_count()
+    if num_gpus == 0:
+        num_gpus = 1
     new_values = None
+    # we consider active global steps
     for values in config.gradual_training:
-        if global_step >= values[0]:
+        if global_step * num_gpus >= values[0]:
             new_values = values
     return new_values[1], new_values[2]
 

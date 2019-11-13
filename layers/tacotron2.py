@@ -132,6 +132,7 @@ class Decoder(nn.Module):
                                    query_dim=self.query_dim,
                                    embedding_dim=in_features,
                                    attention_dim=128,
+                                   memory_dim=memory_dim,
                                    location_attention=location_attn,
                                    attention_location_n_filters=32,
                                    attention_location_kernel_size=31,
@@ -142,7 +143,7 @@ class Decoder(nn.Module):
                                    forward_attn_mask=forward_attn_mask,
                                    attn_K=attn_K)
 
-        self.decoder_rnn = nn.LSTMCell(self.query_dim + in_features,
+        self.decoder_rnn = nn.LSTMCell(self.query_dim,
                                        self.decoder_rnn_dim, 1)
 
         self.linear_projection = Linear(self.decoder_rnn_dim + in_features,
@@ -169,7 +170,7 @@ class Decoder(nn.Module):
         B = inputs.size(0)
         # T = inputs.size(1)
         if not keep_states:
-            self.query = torch.zeros(1, device=inputs.device).repeat(
+            self.attention_rnn_hidden = torch.zeros(1, device=inputs.device).repeat(
                 B, self.query_dim)
             self.attention_rnn_cell_state = torch.zeros(
                 1, device=inputs.device).repeat(B, self.query_dim)
@@ -210,27 +211,25 @@ class Decoder(nn.Module):
     def decode(self, memory):
         '''
          shapes:
-            - memory: B x r * self.memory_dim
+            - memory: B x 1 x self.memory_dim
         '''
-        # self.context: B x D_en
-        # query_input: B x D_en + (r * self.memory_dim)
-        query_input = torch.cat((memory, self.context), -1)
-        # self.query and self.attention_rnn_cell_state : B x D_attn_rnn
-        self.query, self.attention_rnn_cell_state = self.attention_rnn(
-            query_input, (self.query, self.attention_rnn_cell_state))
-        self.query = F.dropout(self.query, self.p_attention_dropout,
-                               self.training)
-        self.attention_rnn_cell_state = F.dropout(
-            self.attention_rnn_cell_state, self.p_attention_dropout,
-            self.training)
         # B x D_en
-        self.context = self.attention(self.query, self.inputs,
-                                      self.processed_inputs, self.mask)
-        # B x (D_en + D_attn_rnn)
-        decoder_rnn_input = torch.cat((self.query, self.context), -1)
+        self.context = self.attention(self.attention_rnn_hidden, self.inputs,
+                                      self.processed_inputs, self.mask, memory)
+
+        # B x 1 x self.prenet_dim
+        prenet_output = self.prenet(memory)
+        # self.context: B x D_en
+        # attention_rnn_input: B x D_en + self.prenet_dim)
+        attention_rnn_input = torch.cat((prenet_output, self.context), -1)
+        # self.attention_rnn_hidden and self.attention_rnn_cell_state : B x D_attn_rnn
+        self.attention_rnn_hidden, self.attention_rnn_cell_state = self.attention_rnn(
+            attention_rnn_input, (self.attention_rnn_hidden, self.attention_rnn_cell_state))
+        self.attention_rnn_hidden = F.dropout(self.attention_rnn_hidden, self.p_attention_dropout,
+                               self.training)
         # self.decoder_hidden and self.decoder_cell: B x D_decoder_rnn
         self.decoder_hidden, self.decoder_cell = self.decoder_rnn(
-            decoder_rnn_input, (self.decoder_hidden, self.decoder_cell))
+            self.attention_rnn_hidden, (self.decoder_hidden, self.decoder_cell))
         self.decoder_hidden = F.dropout(self.decoder_hidden,
                                         self.p_decoder_dropout, self.training)
         # B x (D_decoder_rnn + D_en)
@@ -255,7 +254,6 @@ class Decoder(nn.Module):
         memories = self._update_memory(memories)
         if speaker_embeddings is not None:
             memories = torch.cat([memories, speaker_embeddings], dim=-1)
-        memories = self.prenet(memories)
 
         self._init_states(inputs, mask=mask)
         self.attention.init_states(inputs)
