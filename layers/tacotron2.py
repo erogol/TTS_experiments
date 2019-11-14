@@ -279,7 +279,6 @@ class Decoder(nn.Module):
 
         outputs, stop_tokens, alignments, t = [], [], [], 0
         while True:
-            memory = self.prenet(memory)
             if speaker_embeddings is not None:
                 memory = torch.cat([memory, speaker_embeddings], dim=-1)
             decoder_output, alignment, stop_token = self.decode(memory)
