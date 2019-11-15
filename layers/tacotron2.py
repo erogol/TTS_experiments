@@ -127,7 +127,7 @@ class Decoder(nn.Module):
 
         self.attention_rnn = nn.LSTMCell(self.prenet_dim + in_features,
                                          self.query_dim)
-        self.attention_rnn = ZoneOutCell(self.attention_rnn)
+        self.attention_rnn = ZoneOutCell(self.attention_rnn, 0.1)
 
         self.attention = init_attn(attn_type=attn_type,
                                    query_dim=self.query_dim,
@@ -147,7 +147,7 @@ class Decoder(nn.Module):
         self.decoder_rnn = nn.LSTMCell(self.query_dim,
                                        self.decoder_rnn_dim, 1)
 
-        self.decoder_rnn = ZoneOutCell(self.decoder_rnn)
+        self.decoder_rnn = ZoneOutCell(self.decoder_rnn, 0.1)
 
         self.linear_projection = Linear(self.decoder_rnn_dim + in_features,
                                         self.memory_dim * self.r_init)
@@ -228,13 +228,9 @@ class Decoder(nn.Module):
         # self.attention_rnn_hidden and self.attention_rnn_cell_state : B x D_attn_rnn
         self.attention_rnn_hidden, self.attention_rnn_cell_state = self.attention_rnn(
             attention_rnn_input, (self.attention_rnn_hidden, self.attention_rnn_cell_state))
-        self.attention_rnn_hidden = F.dropout(self.attention_rnn_hidden, self.p_attention_dropout,
-                               self.training)
         # self.decoder_hidden and self.decoder_cell: B x D_decoder_rnn
         self.decoder_hidden, self.decoder_cell = self.decoder_rnn(
             self.attention_rnn_hidden, (self.decoder_hidden, self.decoder_cell))
-        self.decoder_hidden = F.dropout(self.decoder_hidden,
-                                        self.p_decoder_dropout, self.training)
         # B x (D_decoder_rnn + D_en)
         decoder_hidden_context = torch.cat((self.decoder_hidden, self.context),
                                            dim=1)
