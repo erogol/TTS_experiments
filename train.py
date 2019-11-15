@@ -553,7 +553,7 @@ def main(args):  # pylint: disable=redefined-outer-name
     print(" | > Num output units : {}".format(ap.num_freq), flush=True)
 
     params = set_weight_decay(model, c.wd)
-    optimizer = RAdam(params, lr=c.lr, weight_decay=0)
+    optimizer = RAdam(params, lr=c.lr, eps=1e-6, weight_decay=0)  # we use an external weight_decay operation.
     if c.stopnet and c.separate_stopnet:
         optimizer_st = RAdam(model.decoder.stopnet.parameters(),
                              lr=c.lr,

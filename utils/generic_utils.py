@@ -351,7 +351,7 @@ def gradual_training_scheduler(global_step, config):
     if num_gpus == 0:
         num_gpus = 1
     new_values = None
-    # we consider active global steps
+    # we set the scheduling wrt num_gpus
     for values in config.gradual_training:
         if global_step * num_gpus >= values[0]:
             new_values = values

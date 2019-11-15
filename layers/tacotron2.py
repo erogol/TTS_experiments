@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 from torch import nn
 from torch.nn import functional as F
-from .common_layers import init_attn, Prenet, Linear
+from .common_layers import init_attn, Prenet, Linear, ZoneOutCell
 
 
 class ConvBNBlock(nn.Module):
@@ -127,6 +127,7 @@ class Decoder(nn.Module):
 
         self.attention_rnn = nn.LSTMCell(self.prenet_dim + in_features,
                                          self.query_dim)
+        self.attention_rnn = ZoneOutCell(self.attention_rnn)
 
         self.attention = init_attn(attn_type=attn_type,
                                    query_dim=self.query_dim,
@@ -145,6 +146,8 @@ class Decoder(nn.Module):
 
         self.decoder_rnn = nn.LSTMCell(self.query_dim,
                                        self.decoder_rnn_dim, 1)
+
+        self.decoder_rnn = ZoneOutCell(self.decoder_rnn)
 
         self.linear_projection = Linear(self.decoder_rnn_dim + in_features,
                                         self.memory_dim * self.r_init)
