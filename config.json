@@ -1,7 +1,7 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech-w/o-bd",
-    "run_description": "tacotron2 without bidirectional decoder",
+    "run_name": "ljspeech-t2",
+    "run_description": "tacotron2 without forward attention with ta BASELINE",
 
     // AUDIO PARAMETERS
     "audio":{
@@ -90,8 +90,8 @@
     "max_seq_len": 150,     // DATASET-RELATED: maximum text length
 
     // PATHS
-    // "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
-    "output_path": "/media/erogol/data_ssd/Models/runs/",
+    "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
+    // "output_path": "/media/erogol/data_ssd/Models/runs/",
  
     // PHONEMES
     "phoneme_cache_path": "mozilla_us_phonemes",  // phoneme computation is slow, therefore, it caches results in the given folder.
@@ -108,8 +108,8 @@
         [
             {
                 "name": "ljspeech",
-                // "path": "/data/ro/shared/data/keithito/LJSpeech-1.1/",
-                "path": "/home/erogol/Data/LJSpeech-1.1",
+                "path": "/data/ro/shared/data/keithito/LJSpeech-1.1/",
+                // "path": "/home/erogol/Data/LJSpeech-1.1",
                 "meta_file_train": "metadata_train.csv",
                 "meta_file_val": "metadata_val.csv"
             }
