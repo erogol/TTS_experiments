@@ -141,13 +141,14 @@ class GravesAttention(nn.Module):
     def preprocess_inputs(self, inputs):
         return None
 
-    def forward(self, query, inputs, processed_inputs, mask):
+    def forward(self, query, inputs, processed_inputs, mask, memory):
         """
         shapes:
             query: B x D_attention_rnn
             inputs: B x T_in x D_encoder
             processed_inputs: place_holder
             mask: B x T_in
+            memory: B x 1 x decoder.memory_dim
         """
         gbk_t = self.N_a(query)
         gbk_t = gbk_t.view(gbk_t.size(0), -1, self.K)
@@ -194,7 +195,7 @@ class OriginalAttention(nn.Module):
     """
     # Pylint gets confused by PyTorch conventions here
     #pylint: disable=attribute-defined-outside-init
-    def __init__(self, query_dim, embedding_dim, attention_dim,
+    def __init__(self, query_dim, embedding_dim, attention_dim, memory_dim,
                  location_attention, attention_location_n_filters,
                  attention_location_kernel_size, windowing, norm, forward_attn,
                  trans_agent, forward_attn_mask):
@@ -206,7 +207,7 @@ class OriginalAttention(nn.Module):
         self.v = Linear(attention_dim, 1, bias=True)
         if trans_agent:
             self.ta = nn.Linear(
-                query_dim + embedding_dim, 1, bias=True)
+                query_dim + embedding_dim + memory_dim, 1, bias=True)
         if location_attention:
             self.location_layer = LocationLayer(
                 attention_dim,
@@ -296,8 +297,8 @@ class OriginalAttention(nn.Module):
                             (1, 0, 0, 0))
         # compute transition potentials
         alpha = ((1 - self.u) * self.alpha
-                 + self.u * fwd_shifted_alpha
-                 + 1e-8) * alignment
+                 + self.u * fwd_shifted_alpha) * alignment
+        alpha = torch.clamp(alpha, 1e-7)
         # force incremental alignment
         if not self.training and self.forward_attn_mask:
             _, n = fwd_shifted_alpha.max(1)
@@ -314,13 +315,14 @@ class OriginalAttention(nn.Module):
         alpha = alpha / alpha.sum(dim=1, keepdim=True)
         return alpha
 
-    def forward(self, query, inputs, processed_inputs, mask):
+    def forward(self, query, inputs, processed_inputs, mask, memory):
         """
         shapes:
             query: B x D_attn_rnn
             inputs: B x T_en x D_en
             processed_inputs:: B x T_en x D_attn
             mask: B x T_en
+            memory: B x 1 x decoder.memory_dim
         """
         if self.location_attention:
             attention, _ = self.get_location_attention(
@@ -359,18 +361,18 @@ class OriginalAttention(nn.Module):
 
         # compute transition agent
         if self.forward_attn and self.trans_agent:
-            ta_input = torch.cat([context, query.squeeze(1)], dim=-1)
+            ta_input = torch.cat([context, memory, query.squeeze(1)], dim=-1)
             self.u = torch.sigmoid(self.ta(ta_input))
         return context
 
 
-def init_attn(attn_type, query_dim, embedding_dim, attention_dim,
+def init_attn(attn_type, query_dim, embedding_dim, attention_dim, memory_dim,
               location_attention, attention_location_n_filters,
               attention_location_kernel_size, windowing, norm, forward_attn,
               trans_agent, forward_attn_mask, attn_K):
     if attn_type == "original":
         return OriginalAttention(query_dim, embedding_dim, attention_dim,
-                                 location_attention,
+                                 memory_dim, location_attention,
                                  attention_location_n_filters,
                                  attention_location_kernel_size, windowing,
                                  norm, forward_attn, trans_agent,

@@ -140,7 +140,8 @@ class Decoder(nn.Module):
                                    forward_attn=forward_attn,
                                    trans_agent=trans_agent,
                                    forward_attn_mask=forward_attn_mask,
-                                   attn_K=attn_K)
+                                   attn_K=attn_K,
+                                   memory_dim=memory_dim)
 
         self.decoder_rnn = nn.LSTMCell(self.query_dim + in_features,
                                        self.decoder_rnn_dim, 1)
@@ -212,9 +213,10 @@ class Decoder(nn.Module):
          shapes:
             - memory: B x r * self.memory_dim
         '''
+        prenet_output = self.prenet(memory)
         # self.context: B x D_en
         # query_input: B x D_en + (r * self.memory_dim)
-        query_input = torch.cat((memory, self.context), -1)
+        query_input = torch.cat((prenet_output, self.context), -1)
         # self.query and self.attention_rnn_cell_state : B x D_attn_rnn
         self.query, self.attention_rnn_cell_state = self.attention_rnn(
             query_input, (self.query, self.attention_rnn_cell_state))
@@ -225,7 +227,7 @@ class Decoder(nn.Module):
             self.training)
         # B x D_en
         self.context = self.attention(self.query, self.inputs,
-                                      self.processed_inputs, self.mask)
+                                      self.processed_inputs, self.mask, memory)
         # B x (D_en + D_attn_rnn)
         decoder_rnn_input = torch.cat((self.query, self.context), -1)
         # self.decoder_hidden and self.decoder_cell: B x D_decoder_rnn
@@ -255,7 +257,6 @@ class Decoder(nn.Module):
         memories = self._update_memory(memories)
         if speaker_embeddings is not None:
             memories = torch.cat([memories, speaker_embeddings], dim=-1)
-        memories = self.prenet(memories)
 
         self._init_states(inputs, mask=mask)
         self.attention.init_states(inputs)
@@ -281,7 +282,6 @@ class Decoder(nn.Module):
 
         outputs, stop_tokens, alignments, t = [], [], [], 0
         while True:
-            memory = self.prenet(memory)
             if speaker_embeddings is not None:
                 memory = torch.cat([memory, speaker_embeddings], dim=-1)
             decoder_output, alignment, stop_token = self.decode(memory)
