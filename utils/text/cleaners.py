@@ -63,6 +63,19 @@ def convert_to_ascii(text):
     return unidecode(text)
 
 
+def remove_signs(text):
+    text = re.sub(r'[\(\)\[\]\<\>\"]+', '', text)
+    return text
+
+
+def expand_signs(text):
+    text = re.sub("\;", ",", text)
+    text = re.sub("\:", ",", text)
+    text = re.sub("\-", " ", text)
+    text = re.sub("\&", "and", text)
+    return text
+
+
 def basic_cleaners(text):
     '''Basic pipeline that lowercases and collapses whitespace without transliteration.'''
     text = lowercase(text)
@@ -84,6 +97,8 @@ def english_cleaners(text):
     text = lowercase(text)
     text = expand_numbers(text)
     text = expand_abbreviations(text)
+    text = expand_signs(text)
+    text = remove_signs(text)
     text = collapse_whitespace(text)
     return text
 
@@ -93,5 +108,7 @@ def phoneme_cleaners(text):
     text = convert_to_ascii(text)
     text = expand_numbers(text)
     text = expand_abbreviations(text)
+    text = expand_signs(text)
+    text = remove_signs(text)
     text = collapse_whitespace(text)
     return text
