@@ -218,11 +218,6 @@ class Decoder(nn.Module):
         # self.query and self.attention_rnn_cell_state : B x D_attn_rnn
         self.query, self.attention_rnn_cell_state = self.attention_rnn(
             query_input, (self.query, self.attention_rnn_cell_state))
-        self.query = F.dropout(self.query, self.p_attention_dropout,
-                               self.training)
-        self.attention_rnn_cell_state = F.dropout(
-            self.attention_rnn_cell_state, self.p_attention_dropout,
-            self.training)
         # B x D_en
         self.context = self.attention(self.query, self.inputs,
                                       self.processed_inputs, self.mask)
@@ -231,8 +226,6 @@ class Decoder(nn.Module):
         # self.decoder_hidden and self.decoder_cell: B x D_decoder_rnn
         self.decoder_hidden, self.decoder_cell = self.decoder_rnn(
             decoder_rnn_input, (self.decoder_hidden, self.decoder_cell))
-        self.decoder_hidden = F.dropout(self.decoder_hidden,
-                                        self.p_decoder_dropout, self.training)
         # B x (D_decoder_rnn + D_en)
         decoder_hidden_context = torch.cat((self.decoder_hidden, self.context),
                                            dim=1)
