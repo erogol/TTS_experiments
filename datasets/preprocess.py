@@ -135,6 +135,11 @@ def ljspeech(root_path, meta_file):
             wav_file = os.path.join(root_path, 'wavs', cols[0] + '.wav')
             text = cols[1]
             items.append([text, wav_file, speaker_name])
+    new_items = []
+    for idx, item in enumerate(items):
+        if os.path.exists(item[1]):
+           new_items.append(item)
+    items = new_items
     return items
 
 
