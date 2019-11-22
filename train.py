@@ -85,8 +85,11 @@ def format_data(data):
     mel_input = data[4]
     mel_lengths = data[5]
     stop_targets = data[6]
+    item_idx = data[7]
     avg_text_length = torch.mean(text_lengths.float())
     avg_spec_length = torch.mean(mel_lengths.float())
+
+    # print(item_idx)
 
     if c.use_speaker_embedding:
         speaker_ids = [
@@ -149,6 +152,9 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
 
         # format data
         text_input, text_lengths, mel_input, mel_lengths, linear_input, stop_targets, speaker_ids, avg_text_length, avg_spec_length = format_data(data)
+        # print(text_lengths)
+        # print(mel_lengths)
+        # print()
         loader_time = time.time() - end_time
 
         global_step += 1

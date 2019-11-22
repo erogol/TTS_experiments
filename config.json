@@ -135,7 +135,7 @@
     "separate_stopnet": true,     // Train stopnet seperately if 'stopnet==true'. It prevents stopnet loss to influence the rest of the model. It causes a better model, but it trains SLOWER.
 
     // TENSORBOARD and LOGGING
-    "print_step": 5,       // Number of steps to log traning on console.
+    "print_step": 1,       // Number of steps to log traning on console.
     "save_step": 1000,      // Number of training steps expected to save traninpg stats and checkpoints.
     "checkpoint": true,     // If true, it saves checkpoints per "save_step"
     "tb_model_param_stats": false,     // true, plots param stats per layer on tensorboard. Might be memory consuming, but good for debugging. 
