@@ -325,7 +325,7 @@ class Decoder(nn.Module):
         memory = memory.transpose(0, 1)
         return memory
 
-    def _init_states(self, inputs, skip_init=False):
+    def _init_states(self, inputs):
         """
         Initialization of decoder states
         """
@@ -439,7 +439,7 @@ class Decoder(nn.Module):
             t += 1
         return self._parse_outputs(outputs, attentions, stop_tokens)
 
-    def inference(self, inputs, speaker_embeddings=None, skip_init=False):
+    def inference(self, inputs, speaker_embeddings=None):
         """
         Args:
             inputs: encoder outputs.
@@ -453,7 +453,7 @@ class Decoder(nn.Module):
         attentions = []
         stop_tokens = []
         t = 0
-        self._init_states(inputs, skip_init)
+        self._init_states(inputs)
         self.attention.init_win_idx()
         self.attention.init_states(inputs)
         while True:

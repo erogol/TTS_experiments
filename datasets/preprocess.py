@@ -2,6 +2,7 @@ import os
 from glob import glob
 import re
 import sys
+import soundfile as sf
 from TTS.utils.generic_utils import split_dataset
 
 
@@ -138,7 +139,9 @@ def ljspeech(root_path, meta_file):
     new_items = []
     for idx, item in enumerate(items):
         if os.path.exists(item[1]):
-           new_items.append(item)
+            wav, sr = sf.read(item[1])
+            if wav.shape[0] < 1200 * 200:
+               new_items.append(item)
     items = new_items
     return items
 
