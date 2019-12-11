@@ -11,8 +11,8 @@ def create_argparser():
         return x.lower() in ['true', '1', 'yes']
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tts_checkpoint', type=str, help='path to TTS checkpoint file')
-    parser.add_argument('--tts_config', type=str, help='path to TTS config.json file')
+    parser.add_argument('--tts_checkpoint', type=str, default=None, help='path to TTS checkpoint file')
+    parser.add_argument('--tts_config', type=str, default=None, help='path to TTS config.json file')
     parser.add_argument('--tts_speakers', type=str, help='path to JSON file containing speaker ids, if speaker ids are used in the model')
     parser.add_argument('--wavernn_lib_path', type=str, default=None, help='path to WaveRNN project folder to be imported. If this is not passed, model uses Griffin-Lim for synthesis.')
     parser.add_argument('--wavernn_file', type=str, default=None, help='path to WaveRNN checkpoint file.')
@@ -62,6 +62,7 @@ if not args.pwgan_config and os.path.isfile(pwgan_config_file):
 synthesizer = Synthesizer(args)
 
 app = Flask(__name__)
+
 
 @app.route('/')
 def index():

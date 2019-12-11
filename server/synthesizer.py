@@ -166,7 +166,7 @@ class Synthesizer(object):
             inputs = text_to_seqvec(sen, self.tts_config, self.use_cuda)
             # synthesize voice
             decoder_output, postnet_output, alignments, _ = run_model(
-                self.tts_model, inputs, self.tts_config, False, None, None, skip_init=idx>0)
+                self.tts_model, inputs, self.tts_config, False, None, None)
             # convert outputs to numpy
             postnet_output, decoder_output, _ = parse_outputs(
                 postnet_output, decoder_output, alignments)
