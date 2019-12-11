@@ -11,8 +11,8 @@ def create_argparser():
         return x.lower() in ['true', '1', 'yes']
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tts_checkpoint', type=str, help='path to TTS checkpoint file')
-    parser.add_argument('--tts_config', type=str, help='path to TTS config.json file')
+    parser.add_argument('--tts_checkpoint', type=str, default=None, help='path to TTS checkpoint file')
+    parser.add_argument('--tts_config', type=str, default=None, help='path to TTS config.json file')
     parser.add_argument('--tts_speakers', type=str, help='path to JSON file containing speaker ids, if speaker ids are used in the model')
     parser.add_argument('--wavernn_lib_path', type=str, help='path to WaveRNN project folder to be imported. If this is not passed, model uses Griffin-Lim for synthesis.')
     parser.add_argument('--wavernn_file', type=str, help='path to WaveRNN checkpoint file.')
@@ -24,22 +24,14 @@ def create_argparser():
     return parser
 
 
-config = None
 synthesizer = None
 
 embedded_model_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'model')
 checkpoint_file = os.path.join(embedded_model_folder, 'checkpoint.pth.tar')
 config_file = os.path.join(embedded_model_folder, 'config.json')
 
-if os.path.isfile(checkpoint_file) and os.path.isfile(config_file):
-    # Use default config with embedded model files
-    config = create_argparser().parse_args([])
-    config.tts_checkpoint = checkpoint_file
-    config.tts_config = config_file
-    synthesizer = Synthesizer(config)
-
-
 app = Flask(__name__)
+
 
 @app.route('/')
 def index():
@@ -55,8 +47,14 @@ def tts():
 
 
 if __name__ == '__main__':
-    if not config or not synthesizer:
-        args = create_argparser().parse_args()
+    args = create_argparser().parse_args()
+    if args.tts_checkpoint is None and args.tts_config is None:
+        print(f" >  Loading default server model from {embedded_model_folder}.")
+        # Use default config with embedded model files
+        args.tts_checkpoint = checkpoint_file
+        args.tts_config = config_file
+    # Setup synthesizer from CLI args if they're specified or no embedded model
+    # is present.
+    if not synthesizer or args.tts_checkpoint or args.tts_config:
         synthesizer = Synthesizer(args)
-
-    app.run(debug=config.debug, host='0.0.0.0', port=config.port)
+    app.run(debug=args.debug, host='0.0.0.0', port=args.port)
