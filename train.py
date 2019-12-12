@@ -578,7 +578,7 @@ def main(args):  # pylint: disable=redefined-outer-name
         try:
             # TODO: fix optimizer init, model.cuda() needs to be called before
             # optimizer restore
-            # optimizer.load_state_dict(checkpoint['optimizer'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
             if c.reinit_layers:
                 raise RuntimeError
             model.load_state_dict(checkpoint['model'])
