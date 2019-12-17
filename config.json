@@ -1,7 +1,7 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech",
-    "run_description": "tacotron2 without bidirectional decoder",
+    "run_name": "ljspeech-tts_loss",
+    "run_description": "tacotron2 tts-loss batch grouping bias=False",
 
     // AUDIO PARAMETERS
     "audio":{
@@ -90,11 +90,11 @@
     "max_seq_len": 150,     // DATASET-RELATED: maximum text length
 
     // PATHS
-    // "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
-    "output_path": "/media/erogol/data_ssd/Models/runs/",
+    "output_path": "/data6/rw/pit/keep/",      // DATASET-RELATED: output path for all training outputs.
+    //"output_path": "/media/erogol/data_ssd/Models/runs/",
  
     // PHONEMES
-    "phoneme_cache_path": "mozilla_us_phonemes",  // phoneme computation is slow, therefore, it caches results in the given folder.
+    "phoneme_cache_path": "ljspeech_ph_cache",  // phoneme computation is slow, therefore, it caches results in the given folder.
     "use_phonemes": true,           // use phonemes instead of raw characters. It is suggested for better pronounciation.
     "phoneme_language": "en-us",     // depending on your target language, pick one from  https://github.com/bootphon/phonemizer#languages
 
@@ -108,8 +108,8 @@
         [
             {
                 "name": "ljspeech",
-                // "path": "/data/ro/shared/data/keithito/LJSpeech-1.1/",
-                "path": "/home/erogol/Data/LJSpeech-1.1",
+                "path": "/data6/ro/shared/data/keithito/LJSpeech-1.1/",
+                //"path": "/home/erogol/Data/LJSpeech-1.1",
                 "meta_file_train": "metadata_train.csv",
                 "meta_file_val": "metadata_val.csv"
             }
