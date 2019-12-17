@@ -614,7 +614,6 @@ def main(args):  # pylint: disable=redefined-outer-name
         train_loss, global_step = train(model, criterion, criterion_st,
                                         optimizer, optimizer_st, scheduler, ap,
                                         global_step, epoch)
-        train_loss, global_step = 0, 0
         val_loss = evaluate(model, criterion, criterion_st, ap, global_step,
                             epoch)
         print(" | > Training Loss: {:.5f}   Validation Loss: {:.5f}".format(

@@ -93,7 +93,7 @@ class TTSLoss(nn.Module):
             loss_mse = functional.mse_loss(
                 x * mask, target * mask, reduction='none')
             loss_l1 = functional.l1_loss(
-                x * mask, target * mask, reduction='sum')
+                x * mask, target * mask, reduction='none')
             loss_mse = loss_mse.mul(out_weights.cuda()).sum() 
             loss_l1 = loss_l1.mul(out_weights.cuda()).sum() 
         else:
