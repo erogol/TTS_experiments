@@ -168,32 +168,20 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         # loss computation
         stop_loss = criterion_st(stop_tokens,
                                  stop_targets) if c.stopnet else torch.zeros(1)
-        if c.loss_masking:
-            decoder_loss = criterion(decoder_output, mel_input, mel_lengths)
-            if c.model in ["Tacotron", "TacotronGST"]:
-                postnet_loss = criterion(postnet_output, linear_input,
-                                         mel_lengths)
-            else:
-                postnet_loss = criterion(postnet_output, mel_input,
-                                         mel_lengths)
+        decoder_loss_mse, decoder_loss_l1 = criterion(decoder_output, mel_input, mel_lengths, seq_len_norm=True)
+        if c.model in ["Tacotron"]:
+            postnet_loss_l1, postnet_loss_mse = criterion(postnet_output, linear_input, mel_lengths, seq_len_norm=True)
         else:
-            decoder_loss = criterion(decoder_output, mel_input)
-            if c.model in ["Tacotron", "TacotronGST"]:
-                postnet_loss = criterion(postnet_output, linear_input)
-            else:
-                postnet_loss = criterion(postnet_output, mel_input)
-        loss = decoder_loss + postnet_loss
+            postnet_loss_l1, postnet_loss_mse = criterion(postnet_output, mel_input, mel_lengths, seq_len_norm=True)
+        loss = decoder_loss_mse + decoder_loss_l1 + postnet_loss_l1 + postnet_loss_mse
         if not c.separate_stopnet and c.stopnet:
             loss += stop_loss
 
         # backward decoder
         if c.bidirectional_decoder:
-            if c.loss_masking:
-                decoder_backward_loss = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
-            else:
-                decoder_backward_loss = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input)
+            decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
             decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
-            loss += decoder_backward_loss + decoder_c_loss
+            loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
             keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
 
         loss.backward()
@@ -217,22 +205,28 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         step_time = time.time() - start_time
         epoch_time += step_time
 
+        # compute total loss for logging
+        postnet_loss = postnet_loss_mse.item() + postnet_loss_l1.item()
+        decoder_loss = decoder_loss_mse.item() + decoder_loss_l1.item()
+
         if global_step % c.print_step == 0:
             print(
                 "   | > Step:{}/{}  GlobalStep:{}  PostnetLoss:{:.5f}  "
                 "DecoderLoss:{:.5f}  StopLoss:{:.5f}  AlignScore:{:.4f}  GradNorm:{:.5f}  "
                 "GradNormST:{:.5f}  AvgTextLen:{:.1f}  AvgSpecLen:{:.1f}  StepTime:{:.2f}  "
                 "LoaderTime:{:.2f}  LR:{:.6f}".format(
-                    num_iter, batch_n_iter, global_step, postnet_loss.item(),
-                    decoder_loss.item(), stop_loss.item(), align_score,
+                    num_iter, batch_n_iter, global_step, postnet_loss,
+                    decoder_loss, stop_loss.item(), align_score,
                     grad_norm, grad_norm_st, avg_text_length, avg_spec_length,
                     step_time, loader_time, current_lr),
                 flush=True)
 
         # aggregate losses from processes
         if num_gpus > 1:
-            postnet_loss = reduce_tensor(postnet_loss.data, num_gpus)
-            decoder_loss = reduce_tensor(decoder_loss.data, num_gpus)
+            postnet_loss_mse = reduce_tensor(postnet_loss_mse.data, num_gpus)
+            decoder_loss_mse = reduce_tensor(decoder_loss_mse.data, num_gpus)
+            postnet_loss_l1 = reduce_tensor(postnet_loss_l1.data, num_gpus)
+            decoder_loss_l1 = reduce_tensor(decoder_loss_l1.data, num_gpus)
             loss = reduce_tensor(loss.data, num_gpus)
             stop_loss = reduce_tensor(stop_loss.data,
                                       num_gpus) if c.stopnet else stop_loss
@@ -240,9 +234,9 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
         if args.rank == 0:
             update_train_values = {
                 'avg_postnet_loss':
-                float(postnet_loss.item()),
+                postnet_loss,
                 'avg_decoder_loss':
-                float(decoder_loss.item()),
+                decoder_loss,
                 'avg_stop_loss':
                 stop_loss
                 if isinstance(stop_loss, float) else float(stop_loss.item()),
@@ -257,8 +251,10 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             # reduce TB load
             if global_step % 10 == 0:
                 iter_stats = {
-                    "loss_posnet": postnet_loss.item(),
-                    "loss_decoder": decoder_loss.item(),
+                    "loss_posnet_l1": postnet_loss_l1.item(),
+                    "loss_posnet_mse": postnet_loss_mse.item(),
+                    "loss_decoder_l1": decoder_loss_l1.item(),
+                    "loss_decoder_mse": decoder_loss_mse.item(),
                     "lr": current_lr,
                     "grad_norm": grad_norm,
                     "grad_norm_st": grad_norm_st,
@@ -364,37 +360,30 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
                         text_input, text_lengths, mel_input, speaker_ids=speaker_ids)
 
                 # loss computation
-                stop_loss = criterion_st(
-                    stop_tokens, stop_targets) if c.stopnet else torch.zeros(1)
-                if c.loss_masking:
-                    decoder_loss = criterion(decoder_output, mel_input,
-                                             mel_lengths)
-                    if c.model in ["Tacotron", "TacotronGST"]:
-                        postnet_loss = criterion(postnet_output, linear_input,
-                                                 mel_lengths)
-                    else:
-                        postnet_loss = criterion(postnet_output, mel_input,
-                                                 mel_lengths)
+                stop_loss = criterion_st(stop_tokens,
+                                 stop_targets) if c.stopnet else torch.zeros(1)
+                decoder_loss_mse, decoder_loss_l1 = criterion(decoder_output, mel_input, mel_lengths, seq_len_norm=True)
+                if c.model in ["Tacotron"]:
+                    postnet_loss_l1, postnet_loss_mse = criterion(postnet_output, linear_input, mel_lengths, seq_len_norm=True)
                 else:
-                    decoder_loss = criterion(decoder_output, mel_input)
-                    if c.model in ["Tacotron", "TacotronGST"]:
-                        postnet_loss = criterion(postnet_output, linear_input)
-                    else:
-                        postnet_loss = criterion(postnet_output, mel_input)
-                loss = decoder_loss + postnet_loss + stop_loss
+                    postnet_loss_l1, postnet_loss_mse = criterion(postnet_output, mel_input, mel_lengths, seq_len_norm=True)
+                loss = decoder_loss_mse + decoder_loss_l1 + postnet_loss_l1 + postnet_loss_mse
+                if not c.separate_stopnet and c.stopnet:
+                    loss += stop_loss
 
                 # backward decoder loss
                 if c.bidirectional_decoder:
-                    if c.loss_masking:
-                        decoder_backward_loss = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
-                    else:
-                        decoder_backward_loss = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input)
+                    decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
                     decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
-                    loss += decoder_backward_loss + decoder_c_loss
+                    loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
                     keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
 
                 step_time = time.time() - start_time
                 epoch_time += step_time
+
+                 # compute total loss for logging
+                postnet_loss = postnet_loss_mse.item() + postnet_loss_l1.item()
+                decoder_loss = decoder_loss_mse.item() + decoder_loss_l1.item()
 
                 # compute alignment score
                 align_score = alignment_diagonal_score(alignments)
@@ -402,27 +391,29 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
 
                 # aggregate losses from processes
                 if num_gpus > 1:
-                    postnet_loss = reduce_tensor(postnet_loss.data, num_gpus)
-                    decoder_loss = reduce_tensor(decoder_loss.data, num_gpus)
+                    postnet_loss_mse = reduce_tensor(postnet_loss_mse.data, num_gpus)
+                    decoder_loss_mse = reduce_tensor(decoder_loss_mse.data, num_gpus)
+                    postnet_loss_l1 = reduce_tensor(postnet_loss_l1.data, num_gpus)
+                    decoder_loss_l1 = reduce_tensor(decoder_loss_l1.data, num_gpus)
                     if c.stopnet:
                         stop_loss = reduce_tensor(stop_loss.data, num_gpus)
 
                 keep_avg.update_values({
                     'avg_postnet_loss':
-                    float(postnet_loss.item()),
+                    postnet_loss,
                     'avg_decoder_loss':
-                    float(decoder_loss.item()),
+                    decoder_loss,
                     'avg_stop_loss':
                     float(stop_loss.item()),
                 })
 
                 if num_iter % c.print_step == 0:
                     print(
-                        "   | > TotalLoss: {:.5f}   PostnetLoss: {:.5f} - {:.5f}  DecoderLoss:{:.5f} - {:.5f} "
+                        "   | > PostnetLoss: {:.5f} - {:.5f}  DecoderLoss:{:.5f} - {:.5f} "
                         "StopLoss: {:.5f} - {:.5f}  AlignScore: {:.4f} : {:.4f}"
-                        .format(loss.item(), postnet_loss.item(),
+                        .format(postnet_loss,
                                 keep_avg['avg_postnet_loss'],
-                                decoder_loss.item(),
+                                decoder_loss,
                                 keep_avg['avg_decoder_loss'], stop_loss.item(),
                                 keep_avg['avg_stop_loss'], align_score,
                                 keep_avg['avg_align_score']),
@@ -433,7 +424,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
                 idx = np.random.randint(mel_input.shape[0])
                 const_spec = postnet_output[idx].data.cpu().numpy()
                 gt_spec = linear_input[idx].data.cpu().numpy() if c.model in [
-                    "Tacotron", "TacotronGST"
+                    "Tacotron"
                 ] else mel_input[idx].data.cpu().numpy()
                 align_img = alignments[idx].data.cpu().numpy()
 
@@ -559,14 +550,9 @@ def main(args):  # pylint: disable=redefined-outer-name
     else:
         optimizer_st = None
 
-    if c.loss_masking:
-        criterion = L1LossMasked() if c.model in ["Tacotron", "TacotronGST"
-                                                  ] else MSELossMasked()
-    else:
-        criterion = nn.L1Loss() if c.model in ["Tacotron", "TacotronGST"
-                                               ] else nn.MSELoss()
+    criterion = TTSLoss()
     criterion_st = nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor(10)) if c.stopnet else None
+        pos_weight=torch.tensor(15)) if c.stopnet else None
 
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
@@ -628,6 +614,7 @@ def main(args):  # pylint: disable=redefined-outer-name
         train_loss, global_step = train(model, criterion, criterion_st,
                                         optimizer, optimizer_st, scheduler, ap,
                                         global_step, epoch)
+        train_loss, global_step = 0, 0
         val_loss = evaluate(model, criterion, criterion_st, ap, global_step,
                             epoch)
         print(" | > Training Loss: {:.5f}   Validation Loss: {:.5f}".format(
