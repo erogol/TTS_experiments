@@ -6,14 +6,15 @@ from .common_layers import init_attn, Prenet, Linear
 
 
 class ConvBNBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, nonlinear=None):
+    def __init__(self, in_channels, out_channels, kernel_size, bias, nonlinear=None):
         super(ConvBNBlock, self).__init__()
         assert (kernel_size - 1) % 2 == 0
         padding = (kernel_size - 1) // 2
         conv1d = nn.Conv1d(in_channels,
                            out_channels,
                            kernel_size,
-                           padding=padding)
+                           padding=padding,
+                           bias=bias)
         norm = nn.BatchNorm1d(out_channels)
         dropout = nn.Dropout(p=0.5)
         if nonlinear == 'relu':
@@ -33,12 +34,12 @@ class Postnet(nn.Module):
         super(Postnet, self).__init__()
         self.convolutions = nn.ModuleList()
         self.convolutions.append(
-            ConvBNBlock(mel_dim, 512, kernel_size=5, nonlinear='tanh'))
+            ConvBNBlock(mel_dim, 512, kernel_size=5, bias=False, nonlinear='tanh'))
         for _ in range(1, num_convs - 1):
             self.convolutions.append(
-                ConvBNBlock(512, 512, kernel_size=5, nonlinear='tanh'))
+                ConvBNBlock(512, 512, kernel_size=5, bias=False, nonlinear='tanh'))
         self.convolutions.append(
-            ConvBNBlock(512, mel_dim, kernel_size=5, nonlinear=None))
+            ConvBNBlock(512, mel_dim, kernel_size=5, bias=False, nonlinear=None))
 
     def forward(self, x):
         for layer in self.convolutions:
@@ -52,7 +53,7 @@ class Encoder(nn.Module):
         convolutions = []
         for _ in range(3):
             convolutions.append(
-                ConvBNBlock(in_features, in_features, 5, 'relu'))
+                ConvBNBlock(in_features, in_features, 5, False, 'relu'))
         self.convolutions = nn.Sequential(*convolutions)
         self.lstm = nn.LSTM(in_features,
                             int(in_features / 2),
@@ -123,7 +124,7 @@ class Decoder(nn.Module):
             prenet_type,
             prenet_dropout,
             out_features=[self.prenet_dim, self.prenet_dim],
-            bias=False)
+            bias=True)
 
         self.attention_rnn = nn.LSTMCell(self.prenet_dim + in_features,
                                          self.query_dim)
@@ -146,7 +147,8 @@ class Decoder(nn.Module):
                                        self.decoder_rnn_dim, 1)
 
         self.linear_projection = Linear(self.decoder_rnn_dim + in_features,
-                                        self.memory_dim * self.r_init)
+                                        self.memory_dim * self.r_init,
+                                        bias=False)
 
         self.stopnet = nn.Sequential(
             nn.Dropout(0.1),
