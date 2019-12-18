@@ -179,7 +179,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
 
         # backward decoder
         if c.bidirectional_decoder:
-            decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
+            decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths, seq_len_norm=True)
             decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
             loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
             keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
@@ -266,13 +266,13 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
                 if c.checkpoint:
                     # save model
                     save_checkpoint(model, optimizer, optimizer_st,
-                                    postnet_loss.item(), OUT_PATH, global_step,
+                                    postnet_loss, OUT_PATH, global_step,
                                     epoch)
 
                 # Diagnostic visualizations
                 const_spec = postnet_output[0].data.cpu().numpy()
                 gt_spec = linear_input[0].data.cpu().numpy() if c.model in [
-                    "Tacotron", "TacotronGST"
+                    "Tacotron"
                 ] else mel_input[0].data.cpu().numpy()
                 align_img = alignments[0].data.cpu().numpy()
 
@@ -332,6 +332,10 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
     eval_values_dict = {
         'avg_postnet_loss': 0,
         'avg_decoder_loss': 0,
+        'avg_postnet_loss_l1':0,
+        'avg_postnet_loss_mse':0,
+        'avg_decoder_loss_l1':0,
+        'avg_decoder_loss_mse':0,
         'avg_stop_loss': 0,
         'avg_align_score': 0
     }
@@ -373,7 +377,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
 
                 # backward decoder loss
                 if c.bidirectional_decoder:
-                    decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths)
+                    decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths, seq_len_norm=True)
                     decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
                     loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
                     keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
@@ -403,6 +407,10 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
                     postnet_loss,
                     'avg_decoder_loss':
                     decoder_loss,
+                    'avg_postnet_loss_l1': float(postnet_loss_l1.item()),
+                    'avg_postnet_loss_mse': float(postnet_loss_mse.item()),
+                    'avg_decoder_loss_l1': float(decoder_loss_l1.item()),
+                    'avg_decoder_loss_mse': float(decoder_loss_mse.item()),
                     'avg_stop_loss':
                     float(stop_loss.item()),
                 })
@@ -444,8 +452,10 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
 
                 # Plot Validation Stats
                 epoch_stats = {
-                    "loss_postnet": keep_avg['avg_postnet_loss'],
-                    "loss_decoder": keep_avg['avg_decoder_loss'],
+                    "loss_postnet_l1": keep_avg['avg_postnet_loss_l1'],
+                    "loss_decoder_l1": keep_avg['avg_decoder_loss_l1'],
+                    "loss_postnet_mse": keep_avg['avg_postnet_loss_mse'],
+                    "loss_decoder_mse": keep_avg['avg_decoder_loss_mse'],
                     "stop_loss": keep_avg['avg_stop_loss']
                 }
 
