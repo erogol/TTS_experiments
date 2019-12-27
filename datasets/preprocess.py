@@ -30,6 +30,9 @@ def get_preprocessor_by_name(name):
     thismodule = sys.modules[__name__]
     return getattr(thismodule, name.lower())
 
+#################
+# TTS processors
+#################
 
 def tweb(root_path, meta_file):
     """Normalize TWEB dataset.
@@ -125,7 +128,7 @@ def mailabs(root_path, meta_files=None):
 
 
 def ljspeech(root_path, meta_file):
-    """Normalizes the Nancy meta data file to TTS format"""
+    """Normalizes LJSpeech meta data file to TTS format"""
     txt_file = os.path.join(root_path, meta_file)
     items = []
     speaker_name = "ljspeech"
@@ -186,4 +189,26 @@ def libri_tts(root_path, meta_files=None):
                 items.append([text, wav_file, speaker_name])
     for item in items:
         assert os.path.exists(item[1]), f" [!] wav file is not exist - {item[1]}"
+    return items
+
+
+###########################
+# FastSpeech preprocessors
+###########################
+
+
+def ljspeech_fastspeech(root_path, meta_file):
+    """Normalizes LJSpeech meta data file to FastSpeech format"""
+    txt_file = os.path.join(root_path, meta_file)
+    items = []
+    with open(txt_file, 'r') as ttf:
+        for line in ttf:
+            line = line.strip()
+            cols = line.split('|')
+            text = cols[0]
+            wav_file = cols[1]
+            speaker_name = cols[2]
+            mel_file = cols[3]
+            align_file = cols[4]
+            items.append([text, wav_file, speaker_name, mel_file, align_file])
     return items
