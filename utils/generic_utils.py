@@ -358,10 +358,10 @@ def split_dataset(items):
         items_eval = []
         # most stupid code ever -- Fix it !
         while len(items_eval) < eval_split_size:
-            speakers = [item[-1] for item in items]
+            speakers = [item[2] for item in items]
             speaker_counter = Counter(speakers)
             item_idx = np.random.randint(0, len(items))
-            if speaker_counter[items[item_idx][-1]] > 1:
+            if speaker_counter[items[item_idx][2]] > 1:
                 items_eval.append(items[item_idx])
                 del items[item_idx]
         return items_eval, items
