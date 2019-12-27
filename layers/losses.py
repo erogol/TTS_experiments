@@ -70,3 +70,15 @@ class AttentionEntropyLoss(nn.Module):
         entropy = torch.distributions.Categorical(probs=align).entropy()
         loss = (entropy / np.log(align.shape[1])).mean()
         return loss
+
+
+class DurationLoss(nn.Module):
+    def forward(self, y_hat, y, K=5):
+        # y = torch.clamp(y, max=K)
+        # loss = functional.cross_entropy(y_hat.view(y_hat.shape[0] * y_hat.shape[1], y_hat.shape[2]), y.view(y.shape[0] * y.shape[1]))
+        loss = functional.mse_loss(y_hat, torch.log(y.float() + 1.0))
+        # b = torch.zeros(y_hat.shape[0], y_hat.shape[1], 5).to(y_hat.device)
+        # b[:] = torch.FloatTensor(list(range(5)))
+        # y_hat = (y_hat * b).sum(-1)
+        # loss = F.l1_loss(y_hat, y.float())
+        return loss
