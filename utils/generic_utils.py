@@ -335,6 +335,14 @@ def setup_model(num_chars, num_speakers, c):
                         attn_K=c.attention_heads,
                         separate_stopnet=c.separate_stopnet,
                         bidirectional_decoder=c.bidirectional_decoder)
+    elif c.model.lower() == "fastspeech":
+         model = MyModel(num_chars,
+                        r=c.r,
+                        output_dim=c.audio['num_mels'],
+                        attn_dim=384,
+                        attn_num_heads=2,
+                        num_fft_blocks=6,
+                        K=8)
     return model
 
 
