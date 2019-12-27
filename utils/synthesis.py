@@ -30,17 +30,22 @@ def compute_style_mel(style_wav, ap, use_cuda):
 
 
 def run_model(model, inputs, CONFIG, truncated, speaker_id=None, style_mel=None):
-    if CONFIG.use_gst:
-        decoder_output, postnet_output, alignments, stop_tokens = model.inference(
-            inputs, style_mel=style_mel, speaker_ids=speaker_id)
+    if CONFIG.model.lower() == "fastspeech":
+        decoder_output, postnet_output, durs = model.inference(inputs)
+        alignments = model.duration_predictor.compute_alignment_batch(durs, scores=None)
+        return decoder_output, postnet_output, alignments, durs
     else:
-        if truncated:
-            decoder_output, postnet_output, alignments, stop_tokens = model.inference_truncated(
-                inputs, speaker_ids=speaker_id)
-        else:
+        if CONFIG.use_gst:
             decoder_output, postnet_output, alignments, stop_tokens = model.inference(
-                inputs, speaker_ids=speaker_id)
-    return decoder_output, postnet_output, alignments, stop_tokens
+                inputs, style_mel=style_mel, speaker_ids=speaker_id)
+        else:
+            if truncated:
+                decoder_output, postnet_output, alignments, stop_tokens = model.inference_truncated(
+                    inputs, speaker_ids=speaker_id)
+            else:
+                decoder_output, postnet_output, alignments, stop_tokens = model.inference(
+                    inputs, speaker_ids=speaker_id)
+        return decoder_output, postnet_output, alignments, stop_tokens
 
 
 def parse_outputs(postnet_output, decoder_output, alignments):
@@ -97,7 +102,7 @@ def synthesis(model,
     """
     # GST processing
     style_mel = None
-    if CONFIG.model == "TacotronGST" and style_wav is not None:
+    if CONFIG.use_gst and style_wav is not None:
         style_mel = compute_style_mel(style_wav, ap, use_cuda)
     # preprocess the given text
     inputs = text_to_seqvec(text, CONFIG, use_cuda)
@@ -105,8 +110,15 @@ def synthesis(model,
     if speaker_id is not None and use_cuda:
         speaker_id = speaker_id.cuda()
     # synthesize voice
-    decoder_output, postnet_output, alignments, stop_tokens = run_model(
+    if CONFIG.model.lower() == 'fastspeech':
+        decoder_output, postnet_output, alignments, durs = run_model(
         model, inputs, CONFIG, truncated, speaker_id, style_mel)
+        stop_tokens = durs
+    elif  CONFIG.model.lower() in ['tacotron', 'tacotron2']:
+        decoder_output, postnet_output, alignments, stop_tokens = run_model(
+            model, inputs, CONFIG, truncated, speaker_id, style_mel)
+    else:
+        raise RuntimeError(" [!] Model is not defined for synthesis.")
     # convert outputs to numpy
     postnet_output, decoder_output, alignment = parse_outputs(
         postnet_output, decoder_output, alignments)
