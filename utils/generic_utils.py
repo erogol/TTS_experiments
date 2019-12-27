@@ -77,7 +77,7 @@ def remove_experiment_folder(experiment_path):
     checkpoint_files = glob.glob(experiment_path + "/*.pth.tar")
     if not checkpoint_files:
         if os.path.exists(experiment_path):
-            shutil.rmtree(experiment_path)
+            shutil.rmtree(experiment_path, ignore_errors=False, onerror=None)
             print(" ! Run is removed from {}".format(experiment_path))
     else:
         print(" ! Run is kept in {}".format(experiment_path))
@@ -123,7 +123,7 @@ def save_checkpoint(model, optimizer, optimizer_st, model_loss, out_path,
         'epoch': epoch,
         'linear_loss': model_loss,
         'date': datetime.date.today().strftime("%B %d, %Y"),
-        'r': model.decoder.r
+        'r': model.decoder.r if hasattr(model, 'decoder.r') else None
     }
     torch.save(state, checkpoint_path)
 
@@ -139,7 +139,7 @@ def save_best_model(model, optimizer, model_loss, best_loss, out_path,
             'epoch': epoch,
             'linear_loss': model_loss,
             'date': datetime.date.today().strftime("%B %d, %Y"),
-            'r': model.decoder.r
+            'r': model.decoder.r if hasattr(model, 'decoder.r') else None
         }
         best_loss = model_loss
         bestmodel_path = 'best_model.pth.tar'
