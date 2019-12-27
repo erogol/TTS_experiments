@@ -223,6 +223,21 @@ class NoamLR(torch.optim.lr_scheduler._LRScheduler):
         ]
 
 
+class NoamLR2(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, model_size, warmup_steps=0.1, last_epoch=-1):
+        self.model_size = model_size
+        self.warmup_steps = float(warmup_steps)
+        super(NoamLR2, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        step = max(self.last_epoch, 1)
+        return [
+            self.model_size ** (-0.5) *
+            min(step * self.warmup_steps**-1.5, step**-0.5)
+            for base_lr in self.base_lrs
+        ]
+
+
 def mk_decay(init_mk, max_epoch, n_epoch):
     return init_mk * ((max_epoch - n_epoch) / max_epoch)
 
