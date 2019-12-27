@@ -1,3 +1,4 @@
+import math
 import torch
 from torch import nn
 from torch.autograd import Variable
@@ -379,3 +380,97 @@ def init_attn(attn_type, query_dim, embedding_dim, attention_dim,
         return GravesAttention(query_dim, attn_K)
     raise RuntimeError(
         " [!] Given Attention Type '{attn_type}' is not exist.")
+
+
+class MultiHeadAttention(nn.Module):
+    '''
+    input:
+        query: B x T_q x query_dim
+        key: B x T_k x key_dim
+    output:
+        out: B x T_q x num_units
+    '''
+
+    def __init__(self, query_dim, key_dim, num_units, num_heads, dropout):
+
+        super().__init__()
+        self.num_units = num_units
+        self.num_heads = num_heads
+        self.key_dim = key_dim
+        assert self.num_units % self.num_heads == 0, " [!] num_units must be divisible by num_heads"
+        self.split_size = self.num_units // self.num_heads
+        self._mask_value = -1e-20
+
+        self.W_query = nn.Linear(
+            in_features=query_dim, out_features=num_units)
+        self.W_key = nn.Linear(
+            in_features=key_dim, out_features=num_units)
+        self.W_value = nn.Linear(
+            in_features=key_dim, out_features=num_units)
+        self.layer_out = nn.Linear(
+            in_features=key_dim, out_features=num_units)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, query, key, mask=None):
+        B = query.shape[0]
+        queries = self.W_query(query).view(B, -1, self.num_heads, self.split_size) # [B, T_q, num_heads, split_size]
+        keys = self.W_key(key).view(B, -1, self.num_heads, self.split_size)
+        values = self.W_value(key).view(B, -1, self.num_heads, self.split_size)
+
+        # Transpose for attention dot product: B x num_heads x T_q x T_v
+        queries, keys, values = queries.transpose(1, 2), keys.transpose(1, 2), values.transpose(1, 2)
+
+        # score = softmax(QK^T / (d_k ** 0.5))
+        scores = torch.matmul(queries, keys.transpose(2, 3) / (self.split_size**0.5))  # [num_heads, N, T_q, T_k]
+        
+        # masking sequence
+        if mask is not None:
+            mask = mask.unsqueeze(1).unsqueeze(3)
+            scores = scores.masked_fill(mask == 0, self._mask_value)
+
+        scores = torch.softmax(scores, dim=-1)
+        # out = score * V
+        score = self.dropout(scores)
+        out = torch.matmul(scores, values)  # [h, N, T_q, num_units/num_heads]
+        out = out.transpose(1, 2).contiguous().view(B, query.shape[1], -1)
+        out = self.layer_out(out)
+        return out
+
+
+class PositionEncoding(nn.Module):
+    """
+    https://arxiv.org/pdf/1706.03762.pdf
+    """
+
+    def __init__(self, in_features, dropout, max_len=2000):
+        super(PositionEncoding, self).__init__()
+        self.max_len = max_len
+        self.in_features = in_features
+        self.scale = math.sqrt(in_features)
+        self.dropout = nn.Dropout(p=dropout)
+        
+        # Compute the positional encodings once in log space.
+        self._setup_encoding()
+
+    def _setup_encoding(self):
+        position = torch.arange(0, self.max_len).unsqueeze(1).float()
+        div_term = torch.exp(torch.arange(0, self.in_features, 2).float() *
+                             -(math.log(10000.0) / self.in_features))
+        pe = torch.zeros(self.max_len, self.in_features)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward_t(self, x, t):
+        if x.shape[1] > self.max_len:
+            self.max_len = x.shape[1]
+            self._setup_encoding()
+        x = self.scale * x + self.pe[t]
+        return self.dropout(x)
+        
+    def forward(self, x):
+        if x.shape[1] > self.max_len:
+            self.max_len = x.shape[1]
+            self._setup_encoding()
+        x = self.scale * x + self.pe[:x.shape[1]]
+        return self.dropout(x)
