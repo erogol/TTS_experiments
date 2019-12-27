@@ -19,10 +19,18 @@
         "mel_fmax": 7600,        // maximum freq level for mel-spec. Tune for dataset!!
         "do_trim_silence": false
     },
+
+    "fastspeech_data_config":{
+        "fastspeech_data_path": "/root/LJSpeech-1.1/fastspeech/",
+        "phoneme_cache_path": "tests/outputs/fast_speech_ph_cache/",
+        "use_phoneme": true,
+        "phoneme_language": "en-us",
+        "text_cleaner": "phoneme_cleaners"
+    },
+
     "hidden_size": 128,
     "embedding_size": 256,
     "text_cleaner": "english_cleaners",
-
     "epochs": 2000,
     "lr": 0.003,
     "lr_patience": 5,
@@ -32,7 +40,6 @@
     "mk": 1.0,
     "num_loader_workers": 4,
     "memory_size": 5,
-
     "save_step": 200,
     "data_path": "tests/data/ljspeech/",
     "output_path": "result",
