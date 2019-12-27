@@ -143,6 +143,7 @@ def main():
         required='--continue_path' not in sys.argv
     )
     args = parser.parse_args()
+    CONFIG = load_config(args.config_path)
 
     # OUT_PATH = create_experiment_folder(CONFIG.output_path, CONFIG.run_name,
                                         # True)
@@ -152,7 +153,13 @@ def main():
     group_id = time.strftime("%Y_%m_%d-%H%M%S")
 
     # set arguments for train.py
-    command = ['train.py']
+    if CONFIG.model.lower() in ["tacotron", "tacotron2"]:
+        command = ['train.py']
+    elif  CONFIG.model.lower() == "fastspeech":
+        command = ['train_fastspeech.py']
+    else:
+        raise RuntimeError(" [!] Undefined model in given config.")
+
     command.append('--continue_path={}'.format(args.continue_path))
     command.append('--restore_path={}'.format(args.restore_path))
     command.append('--config_path={}'.format(args.config_path))
@@ -165,7 +172,8 @@ def main():
         my_env = os.environ.copy()
         my_env["PYTHON_EGG_CACHE"] = "/tmp/tmp{}".format(i)
         command[-1] = '--rank={}'.format(i)
-        stdout = None if i == 0 else open(os.devnull, 'w')
+        # stdout = None if i == 0 else open(os.devnull, 'w')
+        stdout = None if i == 0 else open(f"gpu{i}.txt", 'w')
         p = subprocess.Popen(['python3'] + command, stdout=stdout, env=my_env)
         processes.append(p)
         print(command)
