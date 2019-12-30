@@ -182,7 +182,8 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
             decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths, seq_len_norm=True)
             decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
             loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
-            keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
+            decoder_backward_loss = decoder_backward_loss_mse.item() + decoder_backward_loss_l1.item()
+            keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss, 'avg_decoder_c_loss': decoder_c_loss.item()})
 
         loss.backward()
         optimizer, current_lr = adam_weight_decay(optimizer)
@@ -380,7 +381,8 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
                     decoder_backward_loss_mse, decoder_backward_loss_l1 = criterion(torch.flip(decoder_backward_output, dims=(1, )), mel_input, mel_lengths, seq_len_norm=True)
                     decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_backward_output, dims=(1, )), decoder_output)
                     loss += decoder_backward_loss_mse + decoder_backward_loss_l1 + decoder_c_loss
-                    keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss.item(), 'avg_decoder_c_loss': decoder_c_loss.item()})
+                    decoder_backward_loss  = decoder_backward_loss_mse.item() + decoder_backward_loss_l1.item()
+                    keep_avg.update_values({'avg_decoder_b_loss': decoder_backward_loss, 'avg_decoder_c_loss': decoder_c_loss.item()})
 
                 step_time = time.time() - start_time
                 epoch_time += step_time
@@ -562,7 +564,7 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     criterion = TTSLoss()
     criterion_st = nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor(15)) if c.stopnet else None
+        pos_weight=torch.tensor(10)) if c.stopnet else None
 
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
