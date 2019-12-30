@@ -4,6 +4,8 @@ from math import sqrt
 from torch import nn
 from TTS.layers.tacotron2 import Encoder, Decoder, Postnet
 from TTS.utils.generic_utils import sequence_mask
+from TTS.layers.common_layers import Prenet, init_attn, Linear
+
 
 
 # TODO: match function arguments with tacotron

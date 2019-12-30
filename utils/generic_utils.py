@@ -343,6 +343,11 @@ def setup_model(num_chars, num_speakers, c):
                         attn_num_heads=2,
                         num_fft_blocks=6,
                         K=8)
+    elif c.model.lower() == "fastspeechv2":
+         model = MyModel(num_chars,
+                        r=c.r,
+                        output_dim=c.audio['num_mels'],
+                        K=8)
     return model
 
 

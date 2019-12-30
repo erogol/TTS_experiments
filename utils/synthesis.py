@@ -30,7 +30,7 @@ def compute_style_mel(style_wav, ap, use_cuda):
 
 
 def run_model(model, inputs, CONFIG, truncated, speaker_id=None, style_mel=None):
-    if CONFIG.model.lower() == "fastspeech":
+    if CONFIG.model.lower() in ["fastspeech", "fastspeechv2"]:
         decoder_output, postnet_output, durs = model.inference(inputs)
         alignments = model.duration_predictor.compute_alignment_batch(durs, scores=None)
         return decoder_output, postnet_output, alignments, durs
@@ -110,7 +110,7 @@ def synthesis(model,
     if speaker_id is not None and use_cuda:
         speaker_id = speaker_id.cuda()
     # synthesize voice
-    if CONFIG.model.lower() == 'fastspeech':
+    if CONFIG.model.lower() in ['fastspeech', 'fastspeechv2']:
         decoder_output, postnet_output, alignments, durs = run_model(
         model, inputs, CONFIG, truncated, speaker_id, style_mel)
         stop_tokens = durs
