@@ -50,8 +50,12 @@
     "model": "Tacotron2",          // one of the model in models/  
 >>>>>>> tacotron2 using
     "run_name": "turkish",
+<<<<<<< HEAD
     "run_description": "turkish with ~4 hours and bidirectional decoder",
 >>>>>>> config for turkish
+=======
+    "run_description": "turkish no phoneme",
+>>>>>>> turkish dataset updates
 
     // AUDIO PARAMETERS
     "audio":{
@@ -110,8 +114,13 @@
     "test_sentences_file": null,  // set a file to load sentences to be used for testing. If it is null then we use default english sentences.
 
     // OPTIMIZER
+<<<<<<< HEAD
     "noam_schedule": false,        // use noam warmup and lr schedule.
     "grad_clip": 1.0,                // upper limit for gradients for clipping.
+=======
+    "noam_schedule": false,
+    "grad_clip": 1,                // upper limit for gradients for clipping.
+>>>>>>> turkish dataset updates
     "epochs": 1000,                // total number of epochs to train.
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -141,7 +150,7 @@
     "forward_attn_mask": false,    // Additional masking forcing monotonicity only in eval mode.
     "transition_agent": false,     // enable/disable transition agent of forward attention.
     "location_attn": true,        // enable_disable location sensitive attention. It is enabled for TACOTRON by default.
-    "bidirectional_decoder": true,  // use https://arxiv.org/abs/1907.09006. Use it, if attention does not work well with your dataset.
+    "bidirectional_decoder": false,  // use https://arxiv.org/abs/1907.09006. Use it, if attention does not work well with your dataset.
 
     // STOPNET
     "stopnet": true,               // Train stopnet predicting the end of synthesis. 
@@ -173,7 +182,12 @@
 >>>>>>> config for turkish
 
     // PATHS
+<<<<<<< HEAD
     "output_path": "/data/rw/home/Trainings/",
+=======
+    // "output_path": "../keep/",      // DATASET-RELATED: output path for all training outputs.
+    "output_path": "/data3/rw/pit/keep/",
+>>>>>>> turkish dataset updates
  
     // PHONEMES
 <<<<<<< HEAD
@@ -240,6 +254,7 @@
 <<<<<<< HEAD
                 "name": "ljspeech",
                 // "path": "/data/ro/shared/data/keithito/LJSpeech-1.1/",
+<<<<<<< HEAD
                 "path": "/home/erogol/Data/LJSpeech-1.1",
                 "meta_file_train": "metadata_train.csv",
                 "meta_file_val": "metadata_val.csv"
@@ -255,6 +270,9 @@
 =======
                 "name": "ljspeech",
                 "path": "/home/erogol/Data/tr_professional/",
+=======
+                "path": "/data3/rw/home/Turkish",
+>>>>>>> turkish dataset updates
                 "meta_file_train": "metadata.txt",
                 "meta_file_val": null
 >>>>>>> config for finetune
