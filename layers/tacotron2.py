@@ -279,6 +279,9 @@ class Decoder(nn.Module):
         self.attention.init_states(inputs)
 
         outputs, stop_tokens, alignments, t = [], [], [], 0
+        stop_flag = False
+        gap = 15
+        count = 0 
         while True:
             memory = self.prenet(memory)
             if speaker_embeddings is not None:
@@ -325,8 +328,13 @@ class Decoder(nn.Module):
             stop_tokens += [stop_token]
             alignments += [alignment]
 
-            if stop_token > 0.7:
-                break
+            if stop_token > 0.8:
+                 break
+            # stop_flag = alignment[0, -3:].sum() > 0.8 or stop_flag
+            # if stop_flag:
+            #     count += 1
+            # if count == gap:
+            #     break
             if len(outputs) == self.max_decoder_steps:
                 print("   | > Decoder stopped with 'max_decoder_steps")
                 break
