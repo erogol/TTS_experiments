@@ -141,7 +141,7 @@ class TestTTSDataset(unittest.TestCase):
 
                 # check mel-spec correctness
                 mel_spec = mel_input[0].cpu().numpy()
-                wav = self.ap.inv_mel_spectrogram(mel_spec.T)
+                wav = self.ap.inv_melspectrogram(mel_spec.T)
                 self.ap.save_wav(wav, OUTPATH + '/mel_inv_dataloader.wav')
                 shutil.copy(item_idx[0], OUTPATH + '/mel_target_dataloader.wav')
 

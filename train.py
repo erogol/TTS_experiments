@@ -295,7 +295,7 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
                 if c.model in ["Tacotron", "TacotronGST"]:
                     train_audio = ap.inv_spectrogram(const_spec.T)
                 else:
-                    train_audio = ap.inv_mel_spectrogram(const_spec.T)
+                    train_audio = ap.inv_melspectrogram(const_spec.T)
                 tb_logger.tb_train_audios(global_step,
                                           {'TrainAudio': train_audio},
                                           c.audio["sample_rate"])
@@ -447,7 +447,7 @@ def evaluate(model, criterion, criterion_st, ap, global_step, epoch):
             if c.model in ["Tacotron", "TacotronGST"]:
                 eval_audio = ap.inv_spectrogram(const_spec.T)
             else:
-                eval_audio = ap.inv_mel_spectrogram(const_spec.T)
+                eval_audio = ap.inv_melspectrogram(const_spec.T)
             tb_logger.tb_eval_audios(global_step, {"ValAudio": eval_audio},
                                      c.audio["sample_rate"])
 
