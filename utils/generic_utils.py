@@ -421,17 +421,10 @@ def check_config(c):
     _check_argument('sample_rate', c['audio'], restricted=True, val_type=int, min_val=512, max_val=100000)
     _check_argument('frame_length_ms', c['audio'], restricted=True, val_type=float, min_val=10, max_val=1000, alternative='win_length')
     _check_argument('frame_shift_ms', c['audio'], restricted=True, val_type=float, min_val=1, max_val=1000, alternative='hop_length')
-    _check_argument('preemphasis', c['audio'], restricted=True, val_type=float, min_val=0, max_val=1)
-    _check_argument('min_level_db', c['audio'], restricted=True, val_type=int, min_val=-1000, max_val=10)
-    _check_argument('ref_level_db', c['audio'], restricted=True, val_type=int, min_val=0, max_val=1000)
     _check_argument('power', c['audio'], restricted=True, val_type=float, min_val=1, max_val=5)
     _check_argument('griffin_lim_iters', c['audio'], restricted=True, val_type=int, min_val=10, max_val=1000)
 
     # normalization parameters
-    _check_argument('signal_norm', c['audio'], restricted=True, val_type=bool)
-    _check_argument('symmetric_norm', c['audio'], restricted=True, val_type=bool)
-    _check_argument('max_norm', c['audio'], restricted=True, val_type=float, min_val=0.1, max_val=1000)
-    _check_argument('clip_norm', c['audio'], restricted=True, val_type=bool)
     _check_argument('mel_fmin', c['audio'], restricted=True, val_type=float, min_val=0.0, max_val=1000)
     _check_argument('mel_fmax', c['audio'], restricted=True, val_type=float, min_val=500.0)
     _check_argument('do_trim_silence', c['audio'], restricted=True, val_type=bool)
