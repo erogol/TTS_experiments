@@ -1,7 +1,7 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech-ap_lean2",
-    "run_description": "lean audio processor with halve n_fft",
+    "run_name": "ljspeech-guided",
+    "run_description": "guided-attn-loss",
 
     // AUDIO PARAMETERS
     "audio":{
