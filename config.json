@@ -1,13 +1,13 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech-ap_lean",
-    "run_description": "lean audio processor",
+    "run_name": "ljspeech-ap_lean2",
+    "run_description": "lean audio processor with halve n_fft",
 
     // AUDIO PARAMETERS
     "audio":{
         // Audio processing parameters
         "num_mels": 80,         // size of the mel spec frame. 
-        "num_freq": 1025,       // number of stft frequency levels. Size of the linear spectogram frame.
+        "num_freq": 513,       // number of stft frequency levels. Size of the linear spectogram frame.
         "sample_rate": 22050,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
         "win_length": 1024,     // stft window length in ms.
         "hop_length": 256,      // stft window hop-lengh in ms.
@@ -81,7 +81,7 @@
     "num_val_loader_workers": 4,    // number of evaluation data loader processes.
     "batch_group_size": 0,  //Number of batches to shuffle after bucketing.
     "min_seq_len": 6,       // DATASET-RELATED: minimum text length to use in training
-    "max_seq_len": 150,     // DATASET-RELATED: maximum text length
+    "max_seq_len": 153,     // DATASET-RELATED: maximum text length
 
     // PATHS
     "output_path": "/home/erogol/Models/",
@@ -108,4 +108,3 @@
         ]
 
 }
-

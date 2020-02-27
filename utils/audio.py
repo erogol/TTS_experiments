@@ -79,10 +79,10 @@ class AudioProcessor(object):
     
     ### DB and AMP conversion ###
     def amp_to_db(self, x):
-        return np.log10(np.maximum(1e-5, x))
+        return np.log(np.maximum(1e-5, x))
 
     def db_to_amp(self, x):
-        return np.power(10.0, x)
+        return np.exp(x)
 
     ### SPECTROGRAM ###
     def linear_to_mel(self, spectrogram):
@@ -98,6 +98,7 @@ class AudioProcessor(object):
 
     def melspectrogram(self, y):
         D = self._stft(y)
+        assert D.shape[0] == 513
         S = self.amp_to_db(self.linear_to_mel(np.abs(D)))
         return S
 
@@ -128,7 +129,7 @@ class AudioProcessor(object):
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             win_length=self.win_length,
-            pad_mode='constant'
+            pad_mode='reflect'
         )
 
     def _istft(self, y):
