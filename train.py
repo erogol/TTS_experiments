@@ -306,6 +306,8 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
             "alignment_score": keep_avg['avg_align_score'],
             "epoch_time": epoch_time
         }
+        if c.ga_alpha > 0:
+            epoch_stats['guided_attention_loss'] = keep_avg['avg_ga_loss']
         tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
         if c.tb_model_param_stats:
             tb_logger.tb_model_weights(model, global_step)
@@ -435,13 +437,16 @@ def evaluate(model, criterion, ap, global_step, epoch):
                 "loss_postnet": keep_avg['avg_postnet_loss'],
                 "loss_decoder": keep_avg['avg_decoder_loss'],
                 "stop_loss": keep_avg['avg_stop_loss'],
-                "alignment_score": keep_avg['avg_align_score']
+                "alignment_score": keep_avg['avg_align_score'],
+                
             }
 
             if c.bidirectional_decoder:
                 epoch_stats['loss_decoder_backward'] = keep_avg['avg_decoder_b_loss']
                 align_b_img = alignments_backward[idx].data.cpu().numpy()
                 eval_figures['alignment_backward'] = plot_alignment(align_b_img)
+            if c.ga_alpha > 0:
+                epoch_stats['guided_attention_loss'] = keep_avg['avg_ga_loss']
             tb_logger.tb_eval_stats(global_step, epoch_stats)
             tb_logger.tb_eval_figures(global_step, eval_figures)
 
