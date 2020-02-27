@@ -114,12 +114,13 @@ class AudioProcessor(object):
         return self._griffin_lim(S**self.power)
 
     def out_linear_to_mel(self, linear_spec):
-        S = self._denormalize(linear_spec)
-        S = self._db_to_amp(S + self.ref_level_db)
+        # S = self._denormalize(linear_spec)
+        S = linear_spec
+        S = self._db_to_amp(S)
         S = self._linear_to_mel(np.abs(S))
-        S = self._amp_to_db(S) - self.ref_level_db
-        mel = self._normalize(S)
-        return mel
+        S = self._amp_to_db(S)
+        # mel = self._normalize(S)
+        return S
 
     ### STFT and ISTFT ###
     def _stft(self, y):
