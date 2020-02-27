@@ -146,7 +146,6 @@ class GuidedAttentionLoss(torch.nn.Module):
         seq_masks = self._make_masks(ilens, olens).to(att_ws.device)
         losses = ga_masks * att_ws
         loss = torch.mean(losses.masked_select(seq_masks))
-        self._reset_masks()
         return loss
 
     @staticmethod
@@ -157,6 +156,81 @@ class GuidedAttentionLoss(torch.nn.Module):
 
     @staticmethod
     def _make_masks(ilens, olens):
-        in_masks = sequence_mask(ilens)  
-        out_masks = sequence_mask(olens)  
-        return out_masks.unsqueeze(-1) & in_masks.unsqueeze(-2) 
+        in_masks = sequence_mask(ilens)
+        out_masks = sequence_mask(olens)
+        return out_masks.unsqueeze(-1) & in_masks.unsqueeze(-2)
+
+
+class TacotronLoss(torch.nn.Module):
+    def __init__(self, c, stopnet_pos_weight=10, ga_sigma=0.4):
+        super(TacotronLoss, self).__init__()
+        self.stopnet_pos_weight = stopnet_pos_weight
+        self.ga_alpha = c.ga_alpha
+        self.config = c
+        # postnet decoder loss
+        if c.loss_masking:
+            self.criterion = L1LossMasked(c.seq_len_norm) if c.model in [
+                "Tacotron"
+            ] else MSELossMasked(c.seq_len_norm)
+        else:
+            self.criterion = nn.L1Loss() if c.model in ["Tacotron"
+                                                        ] else nn.MSELoss()
+        # guided attention loss
+        if c.ga_alpha > 0:
+            self.criterion_ga = GuidedAttentionLoss(sigma=ga_sigma)
+        # stopnet loss
+        self.criterion_st = BCELossMasked(pos_weight=torch.tensor(stopnet_pos_weight)) if c.stopnet else None
+
+    def forward(self, postnet_output, decoder_output, mel_input, linear_input,
+                stopnet_output, stopnet_target, output_lens, decoder_b_output,
+                alignments, alignment_lens, input_lens):
+
+        return_dict = {}
+        # decoder and postnet losses
+        if self.config.loss_masking:
+            decoder_loss = self.criterion(decoder_output, mel_input,
+                                          output_lens)
+            if self.config.model in ["Tacotron", "TacotronGST"]:
+                postnet_loss = self.criterion(postnet_output, linear_input,
+                                              output_lens)
+            else:
+                postnet_loss = self.criterion(postnet_output, mel_input,
+                                              output_lens)
+        else:
+            decoder_loss = self.criterion(decoder_output, mel_input)
+            if self.config.model in ["Tacotron", "TacotronGST"]:
+                postnet_loss = self.criterion(postnet_output, linear_input)
+            else:
+                postnet_loss = self.criterion(postnet_output, mel_input)
+        loss = decoder_loss + postnet_loss
+        return_dict['decoder_loss'] = decoder_loss
+        return_dict['postnet_loss'] = postnet_loss
+
+        # stopnet loss
+        stop_loss = self.criterion_st(
+            stopnet_output, stopnet_target,
+            output_lens) if self.config.stopnet else torch.zeros(1)
+        if not self.config.separate_stopnet and self.config.stopnet:
+            loss += stop_loss
+        return_dict['stopnet_loss'] = stop_loss
+        
+        # backward decoder loss (if enabled)
+        if self.config.bidirectional_decoder:
+            if self.config.loss_masking:
+                decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input, output_lens)
+            else:
+                decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input)
+            decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_b_output, dims=(1, )), decoder_output)
+            loss += decoder_b_loss + decoder_c_loss
+            return_dict['decoder_b_loss'] = decoder_b_loss
+            return_dict['decoder_c_loss'] = decoder_c_loss
+        
+        # guided attention loss (if enabled)
+        if self.config.ga_alpha > 0:
+            ga_loss = self.criterion_ga(alignments, input_lens, alignment_lens)
+            loss += ga_loss * self.ga_alpha
+            return_dict['ga_loss'] = ga_loss * self.ga_alpha
+        
+        return_dict['loss'] = loss
+        return return_dict
+
