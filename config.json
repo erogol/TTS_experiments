@@ -33,7 +33,7 @@
     "r": 7,                 // Number of decoder frames to predict per iteration. Set the initial values if gradual training is enabled.  
     "gradual_training": [[0, 7, 64], [1, 5, 64], [50000, 3, 32], [130000, 2, 32], [290000, 1, 32]], //set gradual training steps [first_step, r, batch_size]. If it is null, gradual training is disabled. For Tacotron, you might need to reduce the 'batch_size' as you proceeed.
     "loss_masking": true,   // enable / disable loss masking against the sequence padding.
-    "ga_alpha": 0.4,        // weight for guided attention loss. If > 0, guided attention is enabled.
+    "ga_alpha": 1,        // weight for guided attention loss. If > 0, guided attention is enabled.
 
     // VALIDATION
     "run_eval": true,
