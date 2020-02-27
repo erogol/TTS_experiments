@@ -114,7 +114,7 @@ def format_data(data):
     return text_input, text_lengths, mel_input, mel_lengths, linear_input, stop_targets, speaker_ids, avg_text_length, avg_spec_length
 
 
-def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
+def train(model, criterion, optimizer, optimizer_st, scheduler,
           ap, global_step, epoch):
     data_loader = setup_loader(ap, model.decoder.r, is_val=False,
                                verbose=(epoch == 0))
@@ -132,6 +132,8 @@ def train(model, criterion, criterion_st, optimizer, optimizer_st, scheduler,
     if c.bidirectional_decoder:
         train_values['avg_decoder_b_loss'] = 0  # decoder backward loss
         train_values['avg_decoder_c_loss'] = 0  # decoder consistency loss
+    if c.ga_alpha > 0:
+        train_values['avg_ga_loss'] = 0  # guidede attention loss
     keep_avg = KeepAverage()
     keep_avg.add_values(train_values)
     print("\n > Epoch {}/{}".format(epoch, c.epochs), flush=True)
@@ -565,14 +567,8 @@ def main(args):  # pylint: disable=redefined-outer-name
     else:
         optimizer_st = None
 
-    if c.loss_masking:
-        criterion = L1LossMasked(c.seq_len_norm) if c.model in ["Tacotron", "TacotronGST"
-                                                  ] else MSELossMasked(c.seq_len_norm)
-    else:
-        criterion = nn.L1Loss() if c.model in ["Tacotron", "TacotronGST"
-                                               ] else nn.MSELoss()
-    criterion_st = BCELossMasked(
-        pos_weight=torch.tensor(10)) if c.stopnet else None
+    # setup criterion
+    criterion = TacotronLoss(c, stopnet_pos_weight=10.0, ga_sigma=0.4)
 
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
@@ -600,8 +596,6 @@ def main(args):  # pylint: disable=redefined-outer-name
     if use_cuda:
         model.cuda()
         criterion.cuda()
-        if criterion_st:
-            criterion_st.cuda()
 
     # DISTRUBUTED
     if num_gpus > 1:
@@ -631,10 +625,10 @@ def main(args):  # pylint: disable=redefined-outer-name
                 model.decoder_backward.set_r(r)
         print(" > Number of outputs per iteration:", model.decoder.r)
 
-        train_loss, global_step = train(model, criterion, criterion_st,
+        train_loss, global_step = train(model, criterion,
                                         optimizer, optimizer_st, scheduler, ap,
                                         global_step, epoch)
-        val_loss = evaluate(model, criterion, criterion_st, ap, global_step,
+        val_loss = evaluate(model, criterion, ap, global_step,
                             epoch)
         print(" | > Training Loss: {:.5f}   Validation Loss: {:.5f}".format(
             train_loss, val_loss),
