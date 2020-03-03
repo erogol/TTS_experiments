@@ -1,7 +1,7 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech-guided",
-    "run_description": "guided-attn-loss",
+    "run_name": "guided-graves-exp-dropout",
+    "run_description": "guided-graves-attention with g_t dropout",
 
     // AUDIO PARAMETERS
     "audio":{
@@ -51,11 +51,11 @@
     
     // TACOTRON PRENET
     "memory_size": -1,              // ONLY TACOTRON - size of the memory queue used fro storing last decoder predictions for auto-regression. If < 0, memory queue is disabled and decoder only uses the last prediction frame. 
-    "prenet_type": "original",     // "original" or "bn".
+    "prenet_type": "bn",     // "original" or "bn".
     "prenet_dropout": true,        // enable/disable dropout at prenet. 
 
     // ATTENTION
-    "attention_type": "original",  // 'original' or 'graves'
+    "attention_type": "graves",  // 'original' or 'graves'
     "attention_heads": 4,          // number of attention heads (only for 'graves')
     "attention_norm": "sigmoid",   // softmax or sigmoid. Suggested to use softmax for Tacotron2 and sigmoid for Tacotron.
     "windowing": false,            // Enables attention windowing. Used only in eval mode.
@@ -102,7 +102,7 @@
         [
             {
                 "name": "ljspeech",
-                "path": "/home/erogol/Data/LJSpeech-1.1/",
+                "path": "/root/LJSpeech-1.1/",
                 "meta_file_train": "metadata.csv",
                 "meta_file_val": null
             }
