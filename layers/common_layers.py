@@ -164,9 +164,6 @@ class GravesAttention(nn.Module):
         b_t = gbk_t[:, 1, :]
         k_t = gbk_t[:, 2, :]
 
-        if self.training:
-            g_t = torch.nn.functional.dropout(g_t, p=0.5, training=self.training)
-
         # attention GMM parameters
         sig_t = torch.nn.functional.softplus(b_t) + self.eps
 
