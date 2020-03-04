@@ -166,21 +166,20 @@ class GravesAttention(nn.Module):
 
         # attention GMM parameters
         sig_t = torch.nn.functional.softplus(b_t) + self.eps
-
         mu_t = self.mu_prev + torch.nn.functional.softplus(k_t)
         g_t = torch.softmax(g_t, dim=-1) + self.eps
 
-        j = self.J[:inputs.size(1)+1]
+        # decorrelate head weights
+        g_t = torch.nn.functional.dropout(g_t, p=1/self.K, training=self.training)
 
+        j = self.J[:inputs.size(1)+1]
         # attention weights
-        # phi_t = g_t.unsqueeze(-1) * (1 / (1 + torch.sigmoid((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))))
-        # cummulatice logistic distribution
-        phi_t = g_t.unsqueeze(-1) * (1 / (1 + torch.exp((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))))
+        phi_t = g_t.unsqueeze(-1) * (1 / (1 + torch.sigmoid((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))))
 
         # discritize attention weights
         alpha_t = torch.sum(phi_t, 1)
         alpha_t = alpha_t[:, 1:] - alpha_t[:, :-1]
-        alpha_t[alpha_t == 0] = 1e-8
+        alpha_t = torch.clamp(alpha_t, min=self.eps)
 
         # apply masking
         if mask is not None:

@@ -85,7 +85,7 @@
     "max_seq_len": 153,     // DATASET-RELATED: maximum text length
 
     // PATHS
-    "output_path": "/home/erogol/Models/",
+    "output_path": "/data/rw/home/Trainings/",
  
     // PHONEMES
     "phoneme_cache_path": "mozilla_us_phonemes_3",  // phoneme computation is slow, therefore, it caches results in the given folder.
