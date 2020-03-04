@@ -83,6 +83,7 @@
     "batch_group_size": 0,  //Number of batches to shuffle after bucketing.
     "min_seq_len": 6,       // DATASET-RELATED: minimum text length to use in training
     "max_seq_len": 153,     // DATASET-RELATED: maximum text length
+    "mean_var_norm": true,   // Normalizing spectrograms with mean-var ONLY for TACOTRON2 for now
 
     // PATHS
     "output_path": "/home/erogol/Models/",

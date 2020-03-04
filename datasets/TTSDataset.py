@@ -4,6 +4,7 @@ import collections
 import torch
 import random
 from torch.utils.data import Dataset
+from sklearn.preprocessing import StandardScaler
 
 from TTS.utils.text import text_to_sequence, phoneme_to_sequence, pad_with_eos_bos
 from TTS.utils.data import prepare_data, prepare_tensor, prepare_stop_target
@@ -22,6 +23,7 @@ class MyDataset(Dataset):
                  phoneme_cache_path=None,
                  phoneme_language="en-us",
                  enable_eos_bos=False,
+                 mean_var_norm=False,
                  verbose=False):
         """
         Args:
@@ -53,6 +55,7 @@ class MyDataset(Dataset):
         self.phoneme_cache_path = phoneme_cache_path
         self.phoneme_language = phoneme_language
         self.enable_eos_bos = enable_eos_bos
+        self.mean_var_norm = mean_var_norm
         self.verbose = verbose
         if use_phonemes and not os.path.isdir(phoneme_cache_path):
             os.makedirs(phoneme_cache_path, exist_ok=True)
@@ -63,6 +66,17 @@ class MyDataset(Dataset):
                 print("   | > phoneme language: {}".format(phoneme_language))
             print(" | > Number of instances : {}".format(len(self.items)))
         self.sort_items()
+        if self.mean_var_norm:
+            self.compute_mean_var_stats()
+
+    def compute_mean_var_stats(self):
+        self.scaler = StandardScaler()
+        print(" | > Computing data mean and var...")
+        for item in self.items:
+            wav_file = item[1]
+            wav = self.load_wav(wav_file)
+            mel = self.ap.melspectrogram(wav)
+            self.scaler.partial_fit(mel.T)
 
     def load_wav(self, filename):
         audio = self.ap.load_wav(filename)
@@ -189,8 +203,11 @@ class MyDataset(Dataset):
             speaker_name = [batch[idx]['speaker_name']
                             for idx in ids_sorted_decreasing]
 
-            # compute features
-            mel = [self.ap.melspectrogram(w).astype('float32') for w in wav]
+            # compute features TODO: implement scaling for linear specs auch
+            if self.mean_var_norm:
+                mel = [self.scaler.transform(self.ap.melspectrogram(w).astype('float32').T).T for w in wav]
+            else:
+                mel = [self.ap.melspectrogram(w).astype('float32') for w in wav]
             linear = [self.ap.spectrogram(w).astype('float32') for w in wav]
 
             mel_lengths = [m.shape[1] for m in mel] 
