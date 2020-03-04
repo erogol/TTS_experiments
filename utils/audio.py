@@ -98,7 +98,7 @@ class AudioProcessor(object):
 
     def melspectrogram(self, y):
         D = self._stft(y)
-        assert D.shape[0] == 513
+        # assert D.shape[0] == 513
         S = self.amp_to_db(self.linear_to_mel(np.abs(D)))
         return S
 

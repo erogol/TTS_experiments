@@ -62,7 +62,7 @@
     "use_forward_attn": false,      // if it uses forward attention. In general, it aligns faster.
     "forward_attn_mask": false,    // Additional masking forcing monotonicity only in eval mode.
     "transition_agent": false,     // enable/disable transition agent of forward attention.
-    "location_attn": false,        // enable_disable location sensitive attention. It is enabled for TACOTRON by default.
+    "location_attn": true,        // enable_disable location sensitive attention. It is enabled for TACOTRON by default.
     "bidirectional_decoder": false,  // use https://arxiv.org/abs/1907.09006. Use it, if attention does not work well with your dataset.
 
     // STOPNET
