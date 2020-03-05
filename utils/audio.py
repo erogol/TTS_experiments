@@ -3,6 +3,7 @@ import soundfile as sf
 import numpy as np
 import scipy.io
 import scipy.signal
+from sklearn.preprocessing import StandardScaler
 
 
 class AudioProcessor(object):
@@ -38,6 +39,7 @@ class AudioProcessor(object):
         self.do_trim_silence = do_trim_silence
         self.trim_db = trim_db
         self.sound_norm = sound_norm
+        self.scaler = None
         # setup stft parameters
         if hop_length is None:
             self.n_fft, self.hop_length, self.win_length = self._stft_parameters()
@@ -56,6 +58,14 @@ class AudioProcessor(object):
     def save_wav(self, wav, path):
         wav_norm = wav * (32767 / max(0.01, np.max(np.abs(wav))))
         scipy.io.wavfile.write(path, self.sample_rate, wav_norm.astype(np.int16))
+
+    ### normalization ###
+    def compute_scaler(self, file_paths):
+        self.scaler = StandardScaler()
+        for wav_file in file_paths:
+            wav = self.load_wav(wav_file)
+            mel = self.melspectrogram(wav)
+            self.scaler.partial_fit(mel.T)
 
     ### setting up the parameters ###
     def _build_mel_basis(self, ):

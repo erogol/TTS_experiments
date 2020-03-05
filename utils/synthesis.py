@@ -129,6 +129,9 @@ def synthesis(model,
     # convert outputs to numpy
     postnet_output, decoder_output, alignment = parse_outputs(
         postnet_output, decoder_output, alignments)
+    # denormalize
+    if CONFIG.mean_var_norm:
+        postnet_output = ap.scaler.inverse_transform(postnet_output)
     # plot results
     wav = None
     if use_griffin_lim:

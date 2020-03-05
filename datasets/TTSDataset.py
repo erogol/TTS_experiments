@@ -70,13 +70,10 @@ class MyDataset(Dataset):
             self.compute_mean_var_stats()
 
     def compute_mean_var_stats(self):
-        self.scaler = StandardScaler()
-        print(" | > Computing data mean and var...")
-        for item in self.items:
-            wav_file = item[1]
-            wav = self.load_wav(wav_file)
-            mel = self.ap.melspectrogram(wav)
-            self.scaler.partial_fit(mel.T)
+        if self.ap.scaler is None:
+            print(" | > Computing data mean and var...")
+            wav_files = [item[1] for item in self.items]
+            self.ap.compute_scaler(wav_files)
 
     def load_wav(self, filename):
         audio = self.ap.load_wav(filename)
@@ -205,7 +202,7 @@ class MyDataset(Dataset):
 
             # compute features TODO: implement scaling for linear specs auch
             if self.mean_var_norm:
-                mel = [self.scaler.transform(self.ap.melspectrogram(w).astype('float32').T).T for w in wav]
+                mel = [self.ap.scaler.transform(self.ap.melspectrogram(w).astype('float32').T).T for w in wav]
             else:
                 mel = [self.ap.melspectrogram(w).astype('float32') for w in wav]
             linear = [self.ap.spectrogram(w).astype('float32') for w in wav]

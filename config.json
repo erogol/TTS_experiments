@@ -1,7 +1,7 @@
 {
     "model": "Tacotron2",          // one of the model in models/  
-    "run_name": "ljspeech-guided",
-    "run_description": "guided-attn-loss",
+    "run_name": "mean-var-guided",
+    "run_description": "guided-attn-loss with mean-var normalization",
 
     // AUDIO PARAMETERS
     "audio":{
@@ -86,7 +86,7 @@
     "mean_var_norm": true,   // Normalizing spectrograms with mean-var ONLY for TACOTRON2 for now
 
     // PATHS
-    "output_path": "/home/erogol/Models/",
+    "output_path": "/data/rw/home/Trainings/",
  
     // PHONEMES
     "phoneme_cache_path": "mozilla_us_phonemes_3",  // phoneme computation is slow, therefore, it caches results in the given folder.
@@ -102,8 +102,8 @@
     "datasets":   // List of datasets. They all merged and they get different speaker_ids.
         [
             {
-                "name": "ljspeech",
-                "path": "/home/erogol/Data/LJSpeech-1.1/",
+                "name": "ljspeech", 
+                "path": "/root/LJSpeech-1.1/",
                 "meta_file_train": "metadata.csv",
                 "meta_file_val": null
             }
