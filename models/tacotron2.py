@@ -70,7 +70,8 @@ class Tacotron2(nn.Module):
         input_mask = sequence_mask(text_lengths).to(text.device)
         if mel_lengths is not None:
             max_len = mel_lengths.max()
-            max_len = max_len + (self.r - (max_len % self.r)) if max_len % self.r > 0 else max_len 
+            r = self.decoder.r
+            max_len = max_len + (r - (max_len % r)) if max_len % r > 0 else max_len 
             output_mask = sequence_mask(mel_lengths, max_len=max_len).to(text.device)
         # B x D_embed x T_in_max
         embedded_inputs = self.embedding(text).transpose(1, 2)
