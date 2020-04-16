@@ -29,7 +29,7 @@ class Tacotron2(nn.Module):
         super(Tacotron2, self).__init__()
         self.postnet_output_dim = postnet_output_dim
         self.decoder_output_dim = decoder_output_dim
-        self.n_frames_per_step = r
+        self.r = r
         self.bidirectional_decoder = bidirectional_decoder
         decoder_dim = 512 if num_speakers > 1 else 512
         encoder_dim = 512 if num_speakers > 1 else 512
@@ -63,22 +63,41 @@ class Tacotron2(nn.Module):
         mel_outputs_postnet = mel_outputs_postnet.transpose(1, 2)
         return mel_outputs, mel_outputs_postnet, alignments
 
-    def forward(self, text, text_lengths, mel_specs=None, speaker_ids=None):
+    def forward(self, text, text_lengths, mel_specs=None, mel_lengths=None, speaker_ids=None):
         self._init_states()
         # compute mask for padding
-        mask = sequence_mask(text_lengths).to(text.device)
+        # B x T_in_max (boolean)
+        input_mask = sequence_mask(text_lengths).to(text.device)
+        if mel_lengths is not None:
+            max_len = mel_lengths.max()
+            max_len = max_len + (self.r - (max_len % self.r)) if max_len % self.r > 0 else max_len 
+            output_mask = sequence_mask(mel_lengths, max_len=max_len).to(text.device)
+        # B x D_embed x T_in_max
         embedded_inputs = self.embedding(text).transpose(1, 2)
+        # B x T_in_max x D_en
         encoder_outputs = self.encoder(embedded_inputs, text_lengths)
+        # adding speaker embeddding to encoder output 
+        # TODO: try adding speaker embedding to character embedding 
         encoder_outputs = self._add_speaker_embedding(encoder_outputs,
                                                       speaker_ids)
+        encoder_outputs = encoder_outputs * input_mask.unsqueeze(2).expand_as(encoder_outputs)
+        # B x mel_dim x T_out -- B x T_out//r x T_in -- B x T_out//r
         decoder_outputs, alignments, stop_tokens = self.decoder(
-            encoder_outputs, mel_specs, mask)
+            encoder_outputs, mel_specs, input_mask)
+        # sequence masking
+        if mel_lengths is not None:
+            decoder_outputs = decoder_outputs * output_mask.unsqueeze(1).expand_as(decoder_outputs) 
+        # B x mel_dim x T_out 
         postnet_outputs = self.postnet(decoder_outputs)
+        # sequence masking
+        if mel_lengths is not None:
+            postnet_outputs = postnet_outputs * output_mask.unsqueeze(1).expand_as(postnet_outputs)
         postnet_outputs = decoder_outputs + postnet_outputs
+        # B x T_out x mel_dim -- B x T_out x mel_dim -- B x T_out//r x T_in
         decoder_outputs, postnet_outputs, alignments = self.shape_outputs(
             decoder_outputs, postnet_outputs, alignments)
         if self.bidirectional_decoder:
-            decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, mask)
+            decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
             return decoder_outputs, postnet_outputs, alignments, stop_tokens, decoder_outputs_backward, alignments_backward
         return decoder_outputs, postnet_outputs, alignments, stop_tokens
 
