@@ -98,7 +98,7 @@ class Tacotron(nn.Module):
             - speaker_ids: B x 1
         """
         self._init_states()
-        mask = sequence_mask(text_lengths).to(characters.device)
+        input_mask = sequence_mask(text_lengths).to(characters.device)
         # B x T_in x embed_dim
         inputs = self.embedding(characters)
         # B x speaker_embed_dim
@@ -119,7 +119,7 @@ class Tacotron(nn.Module):
         # alignments: B x T_in x encoder_dim
         # stop_tokens: B x T_in
         decoder_outputs, alignments, stop_tokens = self.decoder(
-            encoder_outputs, mel_specs, mask,
+            encoder_outputs, mel_specs, input_mask,
             self.speaker_embeddings_projected)
         # B x T_out x decoder_dim
         postnet_outputs = self.postnet(decoder_outputs)
@@ -128,7 +128,7 @@ class Tacotron(nn.Module):
         # B x T_out x decoder_dim
         decoder_outputs = decoder_outputs.transpose(1, 2).contiguous()
         if self.bidirectional_decoder:
-            decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, mask)
+            decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
             return decoder_outputs, postnet_outputs, alignments, stop_tokens, decoder_outputs_backward, alignments_backward
         return decoder_outputs, postnet_outputs, alignments, stop_tokens
 
