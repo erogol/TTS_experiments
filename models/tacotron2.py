@@ -105,7 +105,6 @@ class Tacotron2(nn.Module):
             alignments_backward = torch.nn.functional.interpolate(alignments_backward, scale_factor=[1, scale_factor, 1])
             decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
             self.decoder_backward.set_r(self.decoder.r_init)
-            breakpoint()
             # decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
             ## END EXPERIMENT
             return decoder_outputs, postnet_outputs, alignments, stop_tokens, decoder_outputs_backward, alignments_backward
