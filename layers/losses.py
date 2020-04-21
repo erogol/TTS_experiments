@@ -184,7 +184,7 @@ class TacotronLoss(torch.nn.Module):
 
     def forward(self, postnet_output, decoder_output, mel_input, linear_input,
                 stopnet_output, stopnet_target, output_lens, decoder_b_output,
-                alignments, alignment_lens, input_lens):
+                alignments, alignment_lens, alignments_backwards, input_lens):
 
         return_dict = {}
         # decoder and postnet losses
@@ -217,12 +217,19 @@ class TacotronLoss(torch.nn.Module):
 
         # backward decoder loss (if enabled)
         if self.config.bidirectional_decoder:
-            if self.config.loss_masking:
-                decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input, output_lens)
-            else:
-                decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input)
-            decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_b_output, dims=(1, )), decoder_output)
-            loss += decoder_b_loss + decoder_c_loss
+            # loss decoders' outputs
+            # if self.config.loss_masking:
+            #     decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input, output_lens)
+            # else:
+            #     decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input)
+            # loss backward decoder vs gt 
+            # decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_b_output, dims=(1, )), decoder_output)
+            ## EXPERIMENT
+            decoder_b_loss = self.criterion(decoder_b_output, mel_input, output_lens)
+            decoder_c_loss = torch.nn.functional.l1_loss(decoder_b_output, decoder_output)
+            attention_c_loss = torch.nn.functional.l1_loss(alignments, alignments_backwards)
+            ## END EXPERIMENT
+            loss += decoder_b_loss + decoder_c_loss + attention_c_loss
             return_dict['decoder_b_loss'] = decoder_b_loss
             return_dict['decoder_c_loss'] = decoder_c_loss
 
