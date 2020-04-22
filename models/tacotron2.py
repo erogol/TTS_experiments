@@ -103,14 +103,14 @@ class Tacotron2(nn.Module):
             self.decoder_backward.r_init = 7
             self.decoder_backward.set_r(7)
             T = mel_specs.shape[1]
-            if T // self.decoder_backward.r > 0:
+            if T % self.decoder_backward.r > 0:
                 padding_size = self.decoder_backward.r  - (T % self.decoder_backward.r)
-            decoder_outputs_backward, alignments_backward, _ = self.decoder_backward(encoder_outputs, torch.nn.functional.pad(mel_specs, (0, 0, 0, padding_size, 0, 0)), input_mask)
+                mel_specs = torch.nn.functional.pad(mel_specs, (0, 0, 0, padding_size, 0, 0))
+            decoder_outputs_backward, alignments_backward, _ = self.decoder_backward(encoder_outputs, mel_specs, input_mask)
             scale_factor = self.decoder.r_init / self.decoder.r
-            alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=52).transpose(1, 2)
+            alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1]).transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward[:, :T, :]
-            alignments_backward = alignments_backward[:, :alignments.shape[1], :]
             # decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
             ## END EXPERIMENT
             return decoder_outputs, postnet_outputs, alignments, stop_tokens, decoder_outputs_backward, alignments_backward
