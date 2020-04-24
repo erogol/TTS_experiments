@@ -176,7 +176,8 @@ class GravesAttention(nn.Module):
         j = self.J[:inputs.size(1)+1]
 
         # attention weights
-        phi_t = g_t.unsqueeze(-1) * (1 / (1 + torch.sigmoid((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))))
+       # phi_t = g_t.unsqueeze(-1) * (1 / (1 + torch.sigmoid((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))))
+        phi_t = g_t.unsqueeze(-1) * torch.sigmoid((mu_t.unsqueeze(-1) - j) / sig_t.unsqueeze(-1))
 
         # discritize attention weights
         alpha_t = torch.sum(phi_t, 1)
