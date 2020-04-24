@@ -128,6 +128,22 @@ class Tacotron2(nn.Module):
         mel_outputs_postnet = mel_outputs + mel_outputs_postnet
         mel_outputs, mel_outputs_postnet, alignments = self.shape_outputs(
             mel_outputs, mel_outputs_postnet, alignments)
+
+
+        # if self.bidirectional_decoder:
+        #     ## START EXPERIMENT
+        #     # TODO: fix this experimental code
+        #     self.decoder_backward.r_init = 7
+        #     self.decoder_backward.set_r(7)
+        #     T = mel_outputs.shape[1]
+        #     decoder_outputs_backward, alignments_backward, _ = self.decoder_backward.inference(encoder_outputs)
+        #     scale_factor = self.decoder.r_init / self.decoder.r
+        #     self.alignments = alignments_backward[:, :int(T//scale_factor)]
+        #     alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1], align_corners=True, mode='linear').transpose(1, 2)
+        #     decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
+        #     decoder_outputs_backward = decoder_outputs_backward[:, :T, :]
+        #     # decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
+        #     ## END EXPERIMENT
         return mel_outputs, mel_outputs_postnet, alignments, stop_tokens
 
     def inference_truncated(self, text, speaker_ids=None):
