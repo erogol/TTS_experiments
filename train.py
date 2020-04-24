@@ -134,7 +134,7 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
     if c.bidirectional_decoder:
         train_values['avg_decoder_b_loss'] = 0  # decoder backward loss
         train_values['avg_decoder_c_loss'] = 0  # decoder consistency loss
-    if c.ga_alpha > -1:
+    if c.ga_alpha > 0:
         train_values['avg_ga_loss'] = 0  # guidede attention loss
     keep_avg = KeepAverage()
     keep_avg.add_values(train_values)
@@ -184,7 +184,7 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
         if c.bidirectional_decoder:
             keep_avg.update_values({'avg_decoder_b_loss': loss_dict['decoder_b_loss'].item(),
                                     'avg_decoder_c_loss': loss_dict['decoder_c_loss'].item()})
-        if c.ga_alpha > -1:
+        if c.ga_alpha > 0:
             keep_avg.update_values({'avg_ga_loss': loss_dict['ga_loss'].item()})
 
         # backward pass
@@ -296,7 +296,7 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
             "alignment_score": keep_avg['avg_align_error'],
             "epoch_time": epoch_time
         }
-        if c.ga_alpha > -1:
+        if c.ga_alpha > 0:
             epoch_stats['guided_attention_loss'] = keep_avg['avg_ga_loss']
         tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
         if c.tb_model_param_stats:
@@ -318,7 +318,7 @@ def evaluate(model, criterion, ap, global_step, epoch):
     if c.bidirectional_decoder:
         eval_values_dict['avg_decoder_b_loss'] = 0  # decoder backward loss
         eval_values_dict['avg_decoder_c_loss'] = 0  # decoder consistency loss
-    if c.ga_alpha > -1:
+    if c.ga_alpha > 0:
         eval_values_dict['avg_ga_loss'] = 0  # guidede attention loss
     keep_avg = KeepAverage()
     keep_avg.add_values(eval_values_dict)
@@ -355,7 +355,7 @@ def evaluate(model, criterion, ap, global_step, epoch):
             if c.bidirectional_decoder:
                 keep_avg.update_values({'avg_decoder_b_loss': loss_dict['decoder_b_loss'].item(),
                                         'avg_decoder_c_loss': loss_dict['decoder_c_loss'].item()})
-            if c.ga_alpha > -1:
+            if c.ga_alpha > 0:
                 keep_avg.update_values({'avg_ga_loss': loss_dict['ga_loss'].item()})
 
             # step time
@@ -420,7 +420,7 @@ def evaluate(model, criterion, ap, global_step, epoch):
                 epoch_stats['loss_decoder_backward'] = keep_avg['avg_decoder_b_loss']
                 align_b_img = alignments_backward[idx].data.cpu().numpy()
                 eval_figures['alignment_backward'] = plot_alignment(align_b_img)
-            if c.ga_alpha > -1:
+            if c.ga_alpha > 0:
                 epoch_stats['guided_attention_loss'] = keep_avg['avg_ga_loss']
             tb_logger.tb_eval_stats(global_step, epoch_stats)
             tb_logger.tb_eval_figures(global_step, eval_figures)
