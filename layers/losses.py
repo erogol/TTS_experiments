@@ -222,16 +222,16 @@ class TacotronLoss(torch.nn.Module):
             #     decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input, output_lens)
             # else:
             #     decoder_b_loss = self.criterion(torch.flip(decoder_b_output, dims=(1, )), mel_input)
-            # loss backward decoder vs gt 
+            # loss backward decoder vs gt
             # decoder_c_loss = torch.nn.functional.l1_loss(torch.flip(decoder_b_output, dims=(1, )), decoder_output)
             ## EXPERIMENT
             decoder_b_loss = self.criterion(decoder_b_output, mel_input, output_lens)
-            decoder_c_loss = torch.nn.functional.l1_loss(decoder_b_output, decoder_output)
+            # decoder_c_loss = torch.nn.functional.l1_loss(decoder_b_output, decoder_output)
             attention_c_loss = torch.nn.functional.l1_loss(alignments, alignments_backwards)
             ## END EXPERIMENT
-            loss += decoder_b_loss + decoder_c_loss + attention_c_loss
+            loss += decoder_b_loss + attention_c_loss
             return_dict['decoder_b_loss'] = decoder_b_loss
-            return_dict['decoder_c_loss'] = decoder_c_loss
+            return_dict['decoder_c_loss'] = attention_c_loss
 
         # guided attention loss (if enabled)
         if self.config.ga_alpha > 0:
