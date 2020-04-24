@@ -239,7 +239,7 @@ class TacotronLoss(torch.nn.Module):
             loss += ga_loss * self.ga_alpha
             return_dict['ga_loss'] = ga_loss * self.ga_alpha
         else:
-            return_dict['ga_loss'] = decoder_loss 
+            return_dict['ga_loss'] = decoder_loss
 
         return_dict['loss'] = loss
         return return_dict

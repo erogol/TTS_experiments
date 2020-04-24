@@ -71,14 +71,14 @@ class Tacotron2(nn.Module):
         if mel_lengths is not None:
             max_len = mel_lengths.max()
             r = self.decoder.r
-            max_len = max_len + (r - (max_len % r)) if max_len % r > 0 else max_len 
+            max_len = max_len + (r - (max_len % r)) if max_len % r > 0 else max_len
             output_mask = sequence_mask(mel_lengths, max_len=max_len).to(text.device)
         # B x D_embed x T_in_max
         embedded_inputs = self.embedding(text).transpose(1, 2)
         # B x T_in_max x D_en
         encoder_outputs = self.encoder(embedded_inputs, text_lengths)
-        # adding speaker embeddding to encoder output 
-        # TODO: try adding speaker embedding to character embedding 
+        # adding speaker embeddding to encoder output
+        # TODO: try adding speaker embedding to character embedding
         encoder_outputs = self._add_speaker_embedding(encoder_outputs,
                                                       speaker_ids)
         encoder_outputs = encoder_outputs * input_mask.unsqueeze(2).expand_as(encoder_outputs)
@@ -87,8 +87,8 @@ class Tacotron2(nn.Module):
             encoder_outputs, mel_specs, input_mask)
         # sequence masking
         if mel_lengths is not None:
-            decoder_outputs = decoder_outputs * output_mask.unsqueeze(1).expand_as(decoder_outputs) 
-        # B x mel_dim x T_out 
+            decoder_outputs = decoder_outputs * output_mask.unsqueeze(1).expand_as(decoder_outputs)
+        # B x mel_dim x T_out
         postnet_outputs = self.postnet(decoder_outputs)
         # sequence masking
         if mel_lengths is not None:
@@ -106,7 +106,7 @@ class Tacotron2(nn.Module):
             if T % self.decoder_backward.r > 0:
                 padding_size = self.decoder_backward.r  - (T % self.decoder_backward.r)
                 mel_specs = torch.nn.functional.pad(mel_specs, (0, 0, 0, padding_size, 0, 0))
-            decoder_outputs_backward, alignments_backward, _ = self.decoder_backward(encoder_outputs, mel_specs, input_mask)
+            decoder_outputs_backward, alignments_backward, _ = self.decoder_backward(encoder_outputs.detach(), mel_specs, input_mask)
             scale_factor = self.decoder.r_init / self.decoder.r
             alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1], align_corners=True, mode='linear').transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
