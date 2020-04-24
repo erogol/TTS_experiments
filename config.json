@@ -2,6 +2,7 @@
     "model": "Tacotron2",
     "run_name": "ljspeech-doub_decoder",
     "run_description": "tacotron2 double decoder experiment no guided attention. I test here if this structure works comparable to guided attention.",
+    "updates": "detach encoder_outputs before lower resolution decoder. Do not use decoder consistency loss.",
 
     // AUDIO PARAMETERS
     "audio":{
