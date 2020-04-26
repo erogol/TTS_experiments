@@ -108,7 +108,7 @@ class Tacotron2(nn.Module):
                 mel_specs = torch.nn.functional.pad(mel_specs, (0, 0, 0, padding_size, 0, 0))
             decoder_outputs_backward, alignments_backward, _ = self.decoder_backward(encoder_outputs.detach(), mel_specs, input_mask)
             scale_factor = self.decoder.r_init / self.decoder.r
-            alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1], align_corners=True, mode='nearest').transpose(1, 2)
+            alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1], mode='nearest').transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward[:, :T, :]
             # decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
