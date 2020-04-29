@@ -165,7 +165,7 @@ class GravesAttention(nn.Module):
         k_t = gbk_t[:, 2, :]
 
         # dropout to decorrelate attention heads
-        g_t = torch.nn.functional.dropout(g_t, p=0.5, training=self.training)
+        # g_t = torch.nn.functional.dropout(g_t, p=0.5, training=self.training)
 
         # attention GMM parameters
         sig_t = torch.nn.functional.softplus(b_t) + self.eps
