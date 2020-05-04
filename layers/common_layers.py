@@ -124,10 +124,7 @@ class GravesAttention(nn.Module):
         # self.attention_alignment = 0.05
         self.eps = 1e-5
         self.J = None
-        self.N_a = nn.Sequential(
-            nn.Linear(query_dim, query_dim, bias=True),
-            nn.ReLU(),
-            nn.Linear(query_dim, 3*K, bias=True))
+        self.N_a = nn.Linear(query_dim, 3*K, bias=False) 
         self.attention_weights = None
         self.mu_prev = None
         self.init_layers()
@@ -172,6 +169,7 @@ class GravesAttention(nn.Module):
 
         mu_t = self.mu_prev + torch.nn.functional.softplus(k_t)
         g_t = torch.softmax(g_t, dim=-1) + self.eps
+        g_t = nn.functional.dropout(g_t, p=0.25, training=self.training)
 
         j = self.J[:inputs.size(1)+1]
 
