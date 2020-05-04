@@ -127,11 +127,6 @@ class GravesAttention(nn.Module):
         self.N_a = nn.Linear(query_dim, 3*K, bias=False) 
         self.attention_weights = None
         self.mu_prev = None
-        self.init_layers()
-
-    def init_layers(self):
-        torch.nn.init.constant_(self.N_a[2].bias[(2*self.K):(3*self.K)], 1.)  # bias mean
-        torch.nn.init.constant_(self.N_a[2].bias[self.K:(2*self.K)], 10)  # bias std
 
     def init_states(self, inputs):
         if self.J is None or inputs.shape[1]+1 > self.J.shape[-1]:
@@ -185,6 +180,9 @@ class GravesAttention(nn.Module):
         # apply masking
         if mask is not None:
             alpha_t.data.masked_fill_(~mask, self._mask_value)
+
+        # norm cum. dist to 0,1 range
+        alpha_t = alpha_t / alpha_t.sum(1, keepdim=True)
 
         context = torch.bmm(alpha_t.unsqueeze(1), inputs).squeeze(1)
         self.attention_weights = alpha_t
