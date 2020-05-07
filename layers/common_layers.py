@@ -174,12 +174,12 @@ class GravesAttention(nn.Module):
         # discritize attention weights
         alpha_t = torch.sum(phi_t, 1)
 
+        # compute cum distribution
+        alpha_t = alpha_t[:, 1:] - alpha_t[:, :-1]
+
         # apply masking
         if mask is not None:
             alpha_t.data.masked_fill_(~mask, self._mask_value)
-
-        # compute cum distribution
-        alpha_t = alpha_t[:, 1:] - alpha_t[:, :-1]
 
         # norm cum. dist to 0,1 range
         # alpha_t = alpha_t / alpha_t.sum(1, keepdim=True)
