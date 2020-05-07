@@ -111,7 +111,10 @@ class Tacotron2(nn.Module):
             alignments_backward = torch.nn.functional.interpolate(alignments_backward.transpose(1, 2), size=alignments.shape[1], mode='nearest').transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward.transpose(1, 2)
             decoder_outputs_backward = decoder_outputs_backward[:, :T, :]
-            # decoder_outputs_backward, alignments_backward = self._backward_inference(mel_specs, encoder_outputs, input_mask)
+            # sequence masking
+            if mel_lengths is not None:
+                decoder_outputs_backward = decoder_outputs_backward * output_mask.unsqueeze(1).expand_as(decoder_outputs_backward)
+            postnet_outputs = postnet_outputs + decoder_outputs_backward
             ## END EXPERIMENT
             return decoder_outputs, postnet_outputs, alignments, stop_tokens, decoder_outputs_backward, alignments_backward
         return decoder_outputs, postnet_outputs, alignments, stop_tokens
