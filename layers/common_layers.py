@@ -148,6 +148,7 @@ class GravesAttention(nn.Module):
             mask: B x T_in
         """
         gbk_t = self.N_a(query)
+        gbk_t = nn.functional.dropout(gbk_t, p=0.25, training=self.training)
         gbk_t = gbk_t.view(gbk_t.size(0), -1, self.K)
 
         # attention model parameters
@@ -163,7 +164,6 @@ class GravesAttention(nn.Module):
         sig_t = torch.nn.functional.softplus(b_t) + self.eps
         mu_t = self.mu_prev + torch.clamp(torch.nn.functional.softplus(k_t), min=0.0, max=3.0)
         g_t = torch.softmax(g_t, dim=-1) + self.eps
-        # g_t = nn.functional.dropout(g_t, p=0.25, training=self.training)
 
         j = self.J[:inputs.size(1)+1]
 
