@@ -33,10 +33,21 @@ from TTS.vocoder.utils.generic_utils import (check_config, plot_results,
 use_cuda, num_gpus = setup_torch_training_env(True, True)
 
 
+# DISTRIBUTED
+if num_gpus > 1:
+    # wrap model for distributed training
+    try:
+        from apex.parallel import DistributedDataParallel
+    except ImportError:
+        raise ImportError("Install apex before using multi-gpu training.")
+
+
 def setup_loader(ap, is_val=False, verbose=False):
     if is_val and not c.run_eval:
         loader = None
     else:
+        # setup sampler for distributed training
+        from torch.utils.data.distributed import DistributedSampler
         dataset = GANDataset(ap=ap,
                              items=eval_data if is_val else train_data,
                              seq_len=c.seq_len,
@@ -49,12 +60,20 @@ def setup_loader(ap, is_val=False, verbose=False):
                              use_cache=c.use_cache,
                              verbose=verbose)
         dataset.shuffle_mapping()
-        # sampler = DistributedSampler(dataset) if num_gpus > 1 else None
+        if num_gpus > 1:
+            sampler = DistributedSampler(
+                    dataset=dataset,
+                    num_replicas=num_gpus,
+                    rank=args.rank,
+                    shuffle=not is_val,
+                )
+        else:
+            sampler = None
         loader = DataLoader(dataset,
                             batch_size=1 if is_val else c.batch_size,
-                            shuffle=True,
+                            shuffle=not is_val and sampler is None,
                             drop_last=False,
-                            sampler=None,
+                            sampler=sampler,
                             num_workers=c.num_val_loader_workers
                             if is_val else c.num_loader_workers,
                             pin_memory=False)
@@ -452,7 +471,16 @@ def main(args):  # pylint: disable=redefined-outer-name
     ap = AudioProcessor(**c.audio)
 
     # DISTRUBUTED
-    # if num_gpus > 1:
+    if num_gpus > 1:
+        torch.distributed.init_process_group(backend=c.distributed["backend"],
+                                             init_method=c.distributed["url"],
+                                             rank=args.rank,
+                                             world_size=num_gpus)
+
+    # suppress logging for distributed training
+    if args.rank != 0:
+        sys.stdout = open(os.devnull, "w")
+
     # init_distributed(args.rank, num_gpus, args.group_id,
     #  c.distributed["backend"], c.distributed["url"])
 
@@ -532,6 +560,11 @@ def main(args):  # pylint: disable=redefined-outer-name
         criterion_disc.cuda()
 
     # DISTRUBUTED
+    if num_gpus > 1:
+        model_gen = DistributedDataParallel(model_gen)
+        model_disc = DistributedDataParallel(model_disc)
+
+    # DISTRUBUTED
     # if num_gpus > 1:
     #     model = apply_gradient_allreduce(model)
 
@@ -590,6 +623,10 @@ if __name__ == '__main__':
                         type=bool,
                         default=False,
                         help='Do not verify commit integrity to run training.')
+    parser.add_argument('--world-size',
+                        type=int,
+                        default=0,
+                        help='world size for distributed training.')
 
     # DISTRUBUTED
     parser.add_argument(

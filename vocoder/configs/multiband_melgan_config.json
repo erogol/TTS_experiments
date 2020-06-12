@@ -36,10 +36,10 @@
     },
 
     // DISTRIBUTED TRAINING
-    // "distributed":{
-    //     "backend": "nccl",
-    //     "url": "tcp:\/\/localhost:54321"
-    // },
+    "distributed":{
+        "backend": "nccl",
+        "url": "tcp:\/\/localhost:54321"
+    },
 
     // MODEL PARAMETERS
     "use_pqmf": true,
