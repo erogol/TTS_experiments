@@ -28,6 +28,8 @@ from TTS.vocoder.utils.console_logger import ConsoleLogger
 from TTS.vocoder.utils.generic_utils import (check_config, plot_results,
                                              setup_discriminator,
                                              setup_generator)
+import torch.multiprocessing as mp
+from torch.utils.data.distributed import DistributedSampler
 
 
 use_cuda, num_gpus = setup_torch_training_env(True, True)
@@ -47,7 +49,7 @@ def setup_loader(ap, is_val=False, verbose=False):
         loader = None
     else:
         # setup sampler for distributed training
-        from torch.utils.data.distributed import DistributedSampler
+        # from torch.utils.data.distributed import DistributedSampler
         dataset = GANDataset(ap=ap,
                              items=eval_data if is_val else train_data,
                              seq_len=c.seq_len,
@@ -139,9 +141,9 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         # PQMF formatting
         if y_hat.shape[1] > 1:
             y_hat_sub = y_hat
-            y_hat = model_G.pqmf_synthesis(y_hat)
+            y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else model_G.pqmf_synthesis(y_hat)
             y_hat_vis = y_hat
-            y_G_sub = model_G.pqmf_analysis(y_G)
+            y_G_sub = model_G.module.pqmf_analysis(y_G) if num_gpus > 1 else model_G.pqmf_analysis(y_G)
 
         if global_step > c.steps_to_start_discriminator:
 
@@ -200,7 +202,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
 
             # PQMF formatting
             if y_hat.shape[1] > 1:
-                y_hat = model_G.pqmf_synthesis(y_hat)
+                y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else  model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
             if len(signature(model_D.forward).parameters) == 2:
@@ -264,7 +266,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
                                       keep_avg.avg_values)
 
         # plot step stats
-        if global_step % 10 == 0:
+        if global_step % 10 == 0 and args.rank == 0:
             iter_stats = {
                 "lr_G": current_lr_G,
                 "lr_D": current_lr_D,
@@ -274,7 +276,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             tb_logger.tb_train_iter_stats(global_step, iter_stats)
 
         # save checkpoint
-        if global_step % c.save_step == 0:
+        if global_step % c.save_step == 0 and args.rank == 0:
             if c.checkpoint:
                 # save model
                 save_checkpoint(model_G,
@@ -306,7 +308,8 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
     # Plot Training Epoch Stats
     epoch_stats = {"epoch_time": epoch_time}
     epoch_stats.update(keep_avg.avg_values)
-    tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
+    if args.rank == 0:
+        tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
     # TODO: plot model stats
     # if c.tb_model_param_stats:
     # tb_logger.tb_model_weights(model, global_step)
@@ -343,9 +346,8 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
         # PQMF formatting
         if y_hat.shape[1] > 1:
             y_hat_sub = y_hat
-            y_hat = model_G.pqmf_synthesis(y_hat)
-            y_G_sub = model_G.pqmf_analysis(y_G)
-
+            y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else model_G.pqmf_synthesis(y_hat)
+            y_G_sub = model_G.module.pqmf_analysis(y_G) if num_gpus > 1 else model_G.pqmf_analysis(y_G)
 
         if global_step > c.steps_to_start_discriminator:
 
@@ -393,7 +395,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
 
             # PQMF formatting
             if y_hat.shape[1] > 1:
-                y_hat = model_G.pqmf_synthesis(y_hat)
+                y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
             if len(signature(model_D.forward).parameters) == 2:
@@ -439,19 +441,20 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
         if c.print_eval:
             c_logger.print_eval_step(num_iter, loss_dict, keep_avg.avg_values)
 
-    # compute spectrograms
-    figures = plot_results(y_hat, y_G, ap, global_step, 'eval')
-    tb_logger.tb_eval_figures(global_step, figures)
+    if args.rank == 0:
+        # compute spectrograms
+        figures = plot_results(y_hat, y_G, ap, global_step, 'eval')
+        tb_logger.tb_eval_figures(global_step, figures)
 
-    # Sample audio
-    sample_voice = y_hat[0].squeeze(0).detach().cpu().numpy()
-    tb_logger.tb_eval_audios(global_step, {'eval/audio': sample_voice},
-                             c.audio["sample_rate"])
+        # Sample audio
+        sample_voice = y_hat[0].squeeze(0).detach().cpu().numpy()
+        tb_logger.tb_eval_audios(global_step, {'eval/audio': sample_voice},
+                                c.audio["sample_rate"])
 
-    # synthesize a full voice
-    data_loader.return_segments = False
+        # synthesize a full voice
+        data_loader.return_segments = False
 
-    tb_logger.tb_eval_stats(global_step, keep_avg.avg_values)
+        tb_logger.tb_eval_stats(global_step, keep_avg.avg_values)
 
     return keep_avg.avg_values
 
@@ -561,8 +564,8 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     # DISTRUBUTED
     if num_gpus > 1:
-        model_gen = DistributedDataParallel(model_gen)
-        model_disc = DistributedDataParallel(model_disc)
+        model_gen = torch.nn.parallel.DistributedDataParallel(model_gen, device_ids=[args.rank], output_device=[args.rank])
+        model_disc = torch.nn.parallel.DistributedDataParallel(model_disc, device_ids=[args.rank], output_device=[args.rank])
 
     # DISTRUBUTED
     # if num_gpus > 1:
@@ -623,10 +626,6 @@ if __name__ == '__main__':
                         type=bool,
                         default=False,
                         help='Do not verify commit integrity to run training.')
-    parser.add_argument('--world-size',
-                        type=int,
-                        default=0,
-                        help='world size for distributed training.')
 
     # DISTRUBUTED
     parser.add_argument(
@@ -639,6 +638,8 @@ if __name__ == '__main__':
                         default="",
                         help='DISTRIBUTED: process group id.')
     args = parser.parse_args()
+
+    torch.cuda.set_device(args.rank)
 
     if args.continue_path != '':
         args.output_path = args.continue_path
@@ -682,6 +683,7 @@ if __name__ == '__main__':
         tb_logger.tb_add_text('model-description', c['run_description'], 0)
 
     try:
+        # DISTRIBUTED
         main(args)
     except KeyboardInterrupt:
         remove_experiment_folder(OUT_PATH)
