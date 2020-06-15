@@ -162,7 +162,9 @@ def setup_model(num_chars, num_speakers, c):
                         separate_stopnet=c.separate_stopnet,
                         bidirectional_decoder=c.bidirectional_decoder,
                         double_decoder_consistency=c.double_decoder_consistency,
-                        ddc_r=c.ddc_r)
+                        ddc_r=c.ddc_r,
+                        use_decoder_mask=c.use_decoder_mask,
+                        use_attn_mask=c.use_attn_mask)
     elif c.model.lower() == "tacotron2":
         model = MyModel(num_chars=num_chars,
                         num_speakers=num_speakers,
@@ -183,7 +185,9 @@ def setup_model(num_chars, num_speakers, c):
                         separate_stopnet=c.separate_stopnet,
                         bidirectional_decoder=c.bidirectional_decoder,
                         double_decoder_consistency=c.double_decoder_consistency,
-                        ddc_r=c.ddc_r)
+                        ddc_r=c.ddc_r,
+                        use_decoder_mask=c.use_decoder_mask,
+                        use_attn_mask=c.use_attn_mask)
     return model
 
 class KeepAverage():
@@ -287,6 +291,8 @@ def check_config(c):
     _check_argument('gradual_training', c, restricted=False, val_type=list)
     _check_argument('loss_masking', c, restricted=True, val_type=bool)
     # _check_argument('grad_accum', c, restricted=True, val_type=int, min_val=1, max_val=100)
+    _check_argument('use_decoder_mask', c, restricted=True, val_type=bool)
+    _check_argument('use_attn_mask', c, restricted=True, val_type=bool)
 
     # validation parameters
     _check_argument('run_eval', c, restricted=True, val_type=bool)

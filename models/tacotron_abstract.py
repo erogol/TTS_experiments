@@ -28,7 +28,9 @@ class TacotronAbstract(ABC, nn.Module):
                  bidirectional_decoder=False,
                  double_decoder_consistency=False,
                  ddc_r=None,
-                 gst=False):
+                 gst=False,
+                 use_decoder_mask=False,
+                 use_attn_mask=False):
         """ Abstract Tacotron class """
         super().__init__()
         self.num_chars = num_chars
@@ -51,6 +53,8 @@ class TacotronAbstract(ABC, nn.Module):
         self.location_attn = location_attn
         self.attn_K = attn_K
         self.separate_stopnet = separate_stopnet
+        self.use_decoder_mask = use_decoder_mask
+        self.use_attn_mask = use_attn_mask
 
         # layers
         self.embedding = None
@@ -106,9 +110,9 @@ class TacotronAbstract(ABC, nn.Module):
         """Compute masks  against sequence paddings."""
         # B x T_in_max (boolean)
         device = text_lengths.device
-        input_mask = sequence_mask(text_lengths).to(device)
+        input_mask = sequence_mask(text_lengths).to(device) if self.use_attn_mask else None
         output_mask = None
-        if mel_lengths is not None:
+        if mel_lengths is not None and self.use_decoder_mask:
             max_len = mel_lengths.max()
             r = self.decoder.r
             max_len = max_len + (r - (max_len % r)) if max_len % r > 0 else max_len

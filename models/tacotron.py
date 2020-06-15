@@ -29,7 +29,9 @@ class Tacotron(TacotronAbstract):
                  double_decoder_consistency=False,
                  ddc_r=None,
                  gst=False,
-                 memory_size=5):
+                 memory_size=5,
+                 use_decoder_mask=False,
+                 use_attn_mask=False):
         super(Tacotron,
               self).__init__(num_chars, num_speakers, r, postnet_output_dim,
                              decoder_output_dim, attn_type, attn_win,
@@ -37,7 +39,7 @@ class Tacotron(TacotronAbstract):
                              forward_attn, trans_agent, forward_attn_mask,
                              location_attn, attn_K, separate_stopnet,
                              bidirectional_decoder, double_decoder_consistency,
-                             ddc_r, gst)
+                             ddc_r, gst, use_decoder_mask, use_attn_mask)
         decoder_in_features = 512 if num_speakers > 1 else 256
         encoder_in_features = 512 if num_speakers > 1 else 256
         speaker_embedding_dim = 256
@@ -86,6 +88,7 @@ class Tacotron(TacotronAbstract):
             - speaker_ids: B x 1
         """
         self._init_states()
+        # set masks
         input_mask, output_mask = self.compute_masks(text_lengths, mel_lengths)
         # B x T_in x embed_dim
         inputs = self.embedding(characters)
@@ -99,7 +102,8 @@ class Tacotron(TacotronAbstract):
         # B x T_in x encoder_in_features
         encoder_outputs = self.encoder(inputs)
         # sequence masking
-        encoder_outputs = encoder_outputs * input_mask.unsqueeze(2).expand_as(encoder_outputs)
+        if input_mask is not None:
+            encoder_outputs = encoder_outputs * input_mask.unsqueeze(2).expand_as(encoder_outputs)
         # global style token
         if self.gst:
             # B x gst_dim
