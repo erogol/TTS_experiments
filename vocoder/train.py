@@ -279,10 +279,10 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         if global_step % c.save_step == 0 and args.rank == 0:
             if c.checkpoint:
                 # save model
-                save_checkpoint(model_G,
+                save_checkpoint(model_G.module if num_gpus > 1 else model_G,
                                 optimizer_G,
                                 scheduler_G,
-                                model_D,
+                                model_D.module if num_gpus > 1 else model_D,
                                 optimizer_D,
                                 scheduler_D,
                                 global_step,
@@ -592,10 +592,10 @@ def main(args):  # pylint: disable=redefined-outer-name
         target_loss = eval_avg_loss_dict[c.target_loss]
         best_loss = save_best_model(target_loss,
                                     best_loss,
-                                    model_gen,
+                                    model_gen.module if num_gpus > 1 else model_gen,
                                     optimizer_gen,
                                     scheduler_gen,
-                                    model_disc,
+                                    model_disc.module if num_gpus > 1 else model_disc,
                                     optimizer_disc,
                                     scheduler_disc,
                                     global_step,
