@@ -148,7 +148,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         if global_step > c.steps_to_start_discriminator:
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if len(signature(model_D.forward).parameters) == 2 + int(num_gpus > 1):
                 D_out_fake = model_D(y_hat, c_G)
             else:
                 D_out_fake = model_D(y_hat)
@@ -205,7 +205,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
                 y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else  model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if len(signature(model_D.forward).parameters) == 2 + int(num_gpus > 1):
                 D_out_fake = model_D(y_hat.detach(), c_D)
                 D_out_real = model_D(y_D, c_D)
             else:
@@ -351,7 +351,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
 
         if global_step > c.steps_to_start_discriminator:
 
-            if len(signature(model_D.forward).parameters) == 2:
+            if len(signature(model_D.forward).parameters) == 2 + int(num_gpus > 1):
                 D_out_fake = model_D(y_hat, c_G)
             else:
                 D_out_fake = model_D(y_hat)
@@ -398,7 +398,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
                 y_hat = model_G.module.pqmf_synthesis(y_hat) if num_gpus > 1 else model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if len(signature(model_D.forward).parameters) == 2 + int(num_gpus > 1):
                 D_out_fake = model_D(y_hat.detach(), c_G)
                 D_out_real = model_D(y_G, c_G)
             else:
