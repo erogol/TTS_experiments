@@ -514,21 +514,21 @@ def main(args):  # pylint: disable=redefined-outer-name
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
         try:
-            print(" > Restoring Generator Model...")
             model_gen.load_state_dict(checkpoint['model'])
-            print(" > Restoring Generator Optimizer...")
+            print(" > Restored Generator Model.")
             optimizer_gen.load_state_dict(checkpoint['optimizer'])
-            print(" > Restoring Discriminator Model...")
+            print(" > Restored Generator Optimizer.")
             model_disc.load_state_dict(checkpoint['model_disc'])
-            print(" > Restoring Discriminator Optimizer...")
+            print(" > Restored Discriminator Optimizer.")
             optimizer_disc.load_state_dict(checkpoint['optimizer_disc'])
+            print(" > Restored Discriminator Model.")
             if 'scheduler' in checkpoint:
-                print(" > Restoring Generator LR Scheduler...")
+                print(" > Restored Generator LR Scheduler.")
                 scheduler_gen.load_state_dict(checkpoint['scheduler'])
                 # NOTE: Not sure if necessary
                 scheduler_gen.optimizer = optimizer_gen
             if 'scheduler_disc' in checkpoint:
-                print(" > Restoring Discriminator LR Scheduler...")
+                print(" > Restored Discriminator LR Scheduler.")
                 scheduler_disc.load_state_dict(checkpoint['scheduler_disc'])
                 scheduler_disc.optimizer = optimizer_disc
         except RuntimeError:
@@ -537,10 +537,12 @@ def main(args):  # pylint: disable=redefined-outer-name
             model_dict = model_gen.state_dict()
             model_dict = set_init_dict(model_dict, checkpoint['model'], c)
             model_gen.load_state_dict(model_dict)
+            print(" > Restored Generator Model.")
 
             model_dict = model_disc.state_dict()
             model_dict = set_init_dict(model_dict, checkpoint['model_disc'], c)
             model_disc.load_state_dict(model_dict)
+            print(" > Restored Discriminator Model.")
             del model_dict
 
         # reset lr if not countinuining training.
