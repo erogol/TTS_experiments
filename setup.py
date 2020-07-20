@@ -5,11 +5,12 @@ import os
 import shutil
 import subprocess
 import sys
+import numpy
 
-from setuptools import setup, find_packages
-import setuptools.command.develop
 import setuptools.command.build_py
-
+import setuptools.command.develop
+from Cython.Build import cythonize
+from setuptools import find_packages, setup
 
 parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
 parser.add_argument('--checkpoint', type=str, help='Path to checkpoint file to embed in wheel.')
@@ -53,6 +54,16 @@ class develop(setuptools.command.develop.develop):
     def run(self):
         build_py.create_version_file()
         setuptools.command.develop.develop.run(self)
+
+
+# Handle Cython code
+def find_pyx(path='.'):
+    pyx_files = []
+    for root, dirs, filenames in os.walk(path):
+        for fname in filenames:
+            if fname.endswith('.pyx'):
+                pyx_files.append(os.path.join(root, fname))
+    return pyx_files
 
 
 # The documentation for this feature is in server/README.md
@@ -121,6 +132,8 @@ setup(
             'tts-server = TTS.server.server:main'
         ]
     },
+    ext_modules=cythonize(find_pyx(), language_level=3),
+    include_dirs=[numpy.get_include()],
     packages=find_packages(include=['TTS*']),
     project_urls={
         'Documentation': 'https://github.com/mozilla/TTS/wiki',
