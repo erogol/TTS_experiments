@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from TTS.tts.datasets.preprocess import load_meta_data
 from TTS.tts.datasets.TTSDataset import MyDataset
-from TTS.tts.layers.losses import TacotronLoss
+from TTS.tts.layers.losses import GlowTTSLoss
 from TTS.tts.utils.console_logger import ConsoleLogger
 from TTS.tts.utils.distribute import (DistributedSampler,
                                       apply_gradient_allreduce,
@@ -75,7 +75,7 @@ def setup_loader(ap, r, is_val=False, verbose=False):
     return loader
 
 
-def format_data(data, c):
+def format_data(data):
     if c.use_speaker_embedding:
         speaker_mapping = load_speaker_mapping(OUT_PATH)
 
@@ -83,11 +83,9 @@ def format_data(data, c):
     text_input = data[0]
     text_lengths = data[1]
     speaker_names = data[2]
-    linear_input = data[3] if c.model in ["Tacotron"] else None
-    mel_input = data[4]
+    mel_input = data[4].permute(0, 2, 1)  # B x D x T
     mel_lengths = data[5]
-    stop_targets = data[6]
-    item_idxs = data[7]
+    attn_mask = data[8]
     avg_text_length = torch.mean(text_lengths.float())
     avg_spec_length = torch.mean(mel_lengths.float())
 
@@ -99,29 +97,50 @@ def format_data(data, c):
     else:
         speaker_ids = None
 
-    # set stop targets view, we predict a single stop token per iteration.
-    stop_targets = stop_targets.view(text_input.shape[0],
-                                     stop_targets.size(1) // c.r, -1)
-    stop_targets = (stop_targets.sum(2) >
-                    0.0).unsqueeze(2).float().squeeze(2)
-
     # dispatch data to GPU
     if use_cuda:
         text_input = text_input.cuda(non_blocking=True)
         text_lengths = text_lengths.cuda(non_blocking=True)
         mel_input = mel_input.cuda(non_blocking=True)
         mel_lengths = mel_lengths.cuda(non_blocking=True)
-        linear_input = linear_input.cuda(non_blocking=True) if c.model in ["Tacotron"] else None
-        stop_targets = stop_targets.cuda(non_blocking=True)
         if speaker_ids is not None:
             speaker_ids = speaker_ids.cuda(non_blocking=True)
-    return text_input, text_lengths, mel_input, mel_lengths, linear_input, stop_targets,\
-         speaker_ids, avg_text_length, avg_spec_length, item_idxs
+        if attn_mask is not None:
+            attn_mask = attn_mask.cuda(non_blocking=True)
+    return text_input, text_lengths, mel_input, mel_lengths, speaker_ids,\
+         avg_text_length, avg_spec_length, attn_mask
 
 
-def train(model, criterion, optimizer, optimizer_st, scheduler,
+def data_depended_init(model, ap):
+    """Data depended initialization for normalization layers."""
+
+    for f in model.decoder.flows:
+        if getattr(f, "set_ddi", False):
+            f.set_ddi(True)
+
+    data_loader = setup_loader(ap, 1, is_val=False)
+    model.train()
+    print(" > Data depended initialization ... ")
+    with torch.no_grad():
+        for num_iter, data in enumerate(data_loader):
+
+            # format data
+            text_input, text_lengths, mel_input, mel_lengths, speaker_ids,\
+                avg_text_length, avg_spec_length, attn_mask = format_data(data)
+
+            # forward pass model
+            _ = model.forward(
+                text_input, text_lengths, mel_input, mel_lengths, attn_mask)
+
+    for f in model.decoder.flows:
+        if getattr(f, "set_ddi", False):
+            f.set_ddi(False)
+    return model
+
+
+def train(model, criterion, optimizer, scheduler,
           ap, global_step, epoch):
-    data_loader = setup_loader(ap, model.decoder.r, is_val=False,
+    data_loader = setup_loader(ap, 1, is_val=False,
                                verbose=(epoch == 0))
     model.train()
     epoch_time = 0
@@ -137,8 +156,8 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
         start_time = time.time()
 
         # format data
-        text_input, text_lengths, mel_input, mel_lengths, linear_input, stop_targets, \
-            speaker_ids, avg_text_length, avg_spec_length, item_idxs = format_data(data, c)
+        text_input, text_lengths, mel_input, mel_lengths, speaker_ids,\
+            avg_text_length, avg_spec_length, attn_mask = format_data(data)
         loader_time = time.time() - end_time
 
         global_step += 1
@@ -147,61 +166,35 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
         if c.noam_schedule:
             scheduler.step()
         optimizer.zero_grad()
-        if optimizer_st:
-            optimizer_st.zero_grad()
 
         # forward pass model
-        if c.bidirectional_decoder or c.double_decoder_consistency:
-            decoder_output, postnet_output, alignments, stop_tokens, decoder_backward_output, \
-                alignments_backward = model(
-                text_input, text_lengths, mel_input, mel_lengths, speaker_ids=speaker_ids)
-        else:
-            decoder_output, postnet_output, alignments, stop_tokens = model(
-                text_input, text_lengths, mel_input, mel_lengths, speaker_ids=speaker_ids)
-            decoder_backward_output = None
-            alignments_backward = None
-
-        # set the alignment lengths wrt reduction factor for guided attention
-        if mel_lengths.max() % model.decoder.r != 0:
-            alignment_lengths = (mel_lengths + (model.decoder.r - (mel_lengths.max() % model.decoder.r))) // model.decoder.r
-        else:
-            alignment_lengths = mel_lengths //  model.decoder.r
+        z, logdet, y_mean, y_log_scale, alignments, o_dur_log, o_total_dur = model.forward(
+            text_input, text_lengths, mel_input, mel_lengths, attn_mask)
 
         # compute loss
-        loss_dict = criterion(postnet_output, decoder_output, mel_input,
-                              linear_input, stop_tokens, stop_targets,
-                              mel_lengths, decoder_backward_output,
-                              alignments, alignment_lengths, alignments_backward,
-                              text_lengths)
+        loss_dict = criterion(z, y_mean, y_log_scale, logdet, mel_lengths,
+                              o_dur_log, o_total_dur, text_lengths)
 
         # backward pass
         loss_dict['loss'].backward()
-        optimizer, current_lr = adam_weight_decay(optimizer)
         grad_norm, _ = check_update(model, c.grad_clip, ignore_stopnet=True)
         optimizer.step()
+
+        # current_lr
+        current_lr = optimizer.param_groups[0]['lr']
 
         # compute alignment error (the lower the better )
         align_error = 1 - alignment_diagonal_score(alignments)
         loss_dict['align_error'] = align_error
-
-        # backpass and check the grad norm for stop loss
-        if c.separate_stopnet:
-            loss_dict['stopnet_loss'].backward()
-            optimizer_st, _ = adam_weight_decay(optimizer_st)
-            grad_norm_st, _ = check_update(model.decoder.stopnet, 1.0)
-            optimizer_st.step()
-        else:
-            grad_norm_st = 0
 
         step_time = time.time() - start_time
         epoch_time += step_time
 
         # aggregate losses from processes
         if num_gpus > 1:
-            loss_dict['postnet_loss'] = reduce_tensor(loss_dict['postnet_loss'].data, num_gpus)
-            loss_dict['decoder_loss'] = reduce_tensor(loss_dict['decoder_loss'].data, num_gpus)
+            loss_dict['log_mle'] = reduce_tensor(loss_dict['log_mle'].data, num_gpus)
+            loss_dict['loss_dur'] = reduce_tensor(loss_dict['loss_dur'].data, num_gpus)
             loss_dict['loss'] = reduce_tensor(loss_dict['loss'] .data, num_gpus)
-            loss_dict['stopnet_loss'] = reduce_tensor(loss_dict['stopnet_loss'].data, num_gpus) if c.stopnet else loss_dict['stopnet_loss']
 
         # detach loss values
         loss_dict_new = dict()
@@ -234,7 +227,6 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
                 iter_stats = {
                     "lr": current_lr,
                     "grad_norm": grad_norm,
-                    "grad_norm_st": grad_norm_st,
                     "step_time": step_time
                 }
                 iter_stats.update(loss_dict)
@@ -243,15 +235,16 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
             if global_step % c.save_step == 0:
                 if c.checkpoint:
                     # save model
-                    save_checkpoint(model, optimizer, global_step, epoch, model.decoder.r, OUT_PATH,
-                                    optimizer_st=optimizer_st,
-                                    model_loss=loss_dict['postnet_loss'])
+                    save_checkpoint(model, optimizer, global_step, epoch, 1, OUT_PATH,
+                                    model_loss=loss_dict['loss'])
 
                 # Diagnostic visualizations
-                const_spec = postnet_output[0].data.cpu().numpy()
-                gt_spec = linear_input[0].data.cpu().numpy() if c.model in [
-                    "Tacotron", "TacotronGST"
-                ] else mel_input[0].data.cpu().numpy()
+                # direct pass on model for spec predictions
+                spec_pred, *_ = model.inference(text_input[:1], text_lengths[:1])
+                spec_pred = spec_pred.permute(0, 2, 1)
+                gt_spec = mel_input.permute(0, 2, 1)
+                const_spec = spec_pred[0].data.cpu().numpy()
+                gt_spec = gt_spec[0].data.cpu().numpy()
                 align_img = alignments[0].data.cpu().numpy()
 
                 figures = {
@@ -260,16 +253,10 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
                     "alignment": plot_alignment(align_img),
                 }
 
-                if c.bidirectional_decoder or c.double_decoder_consistency:
-                    figures["alignment_backward"] = plot_alignment(alignments_backward[0].data.cpu().numpy())
-
                 tb_logger.tb_train_figures(global_step, figures)
 
                 # Sample audio
-                if c.model in ["Tacotron", "TacotronGST"]:
-                    train_audio = ap.inv_spectrogram(const_spec.T)
-                else:
-                    train_audio = ap.inv_melspectrogram(const_spec.T)
+                train_audio = ap.inv_melspectrogram(const_spec.T)
                 tb_logger.tb_train_audios(global_step,
                                           {'TrainAudio': train_audio},
                                           c.audio["sample_rate"])
@@ -290,7 +277,7 @@ def train(model, criterion, optimizer, optimizer_st, scheduler,
 
 @torch.no_grad()
 def evaluate(model, criterion, ap, global_step, epoch):
-    data_loader = setup_loader(ap, model.decoder.r, is_val=True)
+    data_loader = setup_loader(ap, 1, is_val=True)
     model.eval()
     epoch_time = 0
     keep_avg = KeepAverage()
@@ -300,31 +287,16 @@ def evaluate(model, criterion, ap, global_step, epoch):
             start_time = time.time()
 
             # format data
-            text_input, text_lengths, mel_input, mel_lengths, linear_input, stop_targets, speaker_ids, _, _ = format_data(data, c)
-            assert mel_input.shape[1] % model.decoder.r == 0
+            text_input, text_lengths, mel_input, mel_lengths, speaker_ids,\
+                avg_text_length, avg_spec_length, attn_mask = format_data(data)
 
             # forward pass model
-            if c.bidirectional_decoder or c.double_decoder_consistency:
-                decoder_output, postnet_output, alignments, stop_tokens, decoder_backward_output, alignments_backward = model(
-                    text_input, text_lengths, mel_input, speaker_ids=speaker_ids)
-            else:
-                decoder_output, postnet_output, alignments, stop_tokens = model(
-                    text_input, text_lengths, mel_input, speaker_ids=speaker_ids)
-                decoder_backward_output = None
-                alignments_backward = None
-
-            # set the alignment lengths wrt reduction factor for guided attention
-            if mel_lengths.max() % model.decoder.r != 0:
-                alignment_lengths = (mel_lengths + (model.decoder.r - (mel_lengths.max() % model.decoder.r))) // model.decoder.r
-            else:
-                alignment_lengths = mel_lengths //  model.decoder.r
+            z, logdet, y_mean, y_log_scale, alignments, o_dur_log, o_total_dur = model.forward(
+                text_input, text_lengths, mel_input, mel_lengths, attn_mask)
 
             # compute loss
-            loss_dict = criterion(postnet_output, decoder_output, mel_input,
-                                  linear_input, stop_tokens, stop_targets,
-                                  mel_lengths, decoder_backward_output,
-                                  alignments, alignment_lengths, alignments_backward,
-                                  text_lengths)
+            loss_dict = criterion(z, y_mean, y_log_scale, logdet, mel_lengths,
+                                o_dur_log, o_total_dur, text_lengths)
 
             # step time
             step_time = time.time() - start_time
@@ -336,10 +308,9 @@ def evaluate(model, criterion, ap, global_step, epoch):
 
             # aggregate losses from processes
             if num_gpus > 1:
-                loss_dict['postnet_loss'] = reduce_tensor(loss_dict['postnet_loss'].data, num_gpus)
-                loss_dict['decoder_loss'] = reduce_tensor(loss_dict['decoder_loss'].data, num_gpus)
-                if c.stopnet:
-                    loss_dict['stopnet_loss'] = reduce_tensor(loss_dict['stopnet_loss'].data, num_gpus)
+                loss_dict['log_mle'] = reduce_tensor(loss_dict['log_mle'].data, num_gpus)
+                loss_dict['loss_dur'] = reduce_tensor(loss_dict['loss_dur'].data, num_gpus)
+                loss_dict['loss'] = reduce_tensor(loss_dict['loss'] .data, num_gpus)
 
             # detach loss values
             loss_dict_new = dict()
@@ -361,12 +332,14 @@ def evaluate(model, criterion, ap, global_step, epoch):
 
         if args.rank == 0:
             # Diagnostic visualizations
-            idx = np.random.randint(mel_input.shape[0])
-            const_spec = postnet_output[idx].data.cpu().numpy()
-            gt_spec = linear_input[idx].data.cpu().numpy() if c.model in [
-                "Tacotron", "TacotronGST"
-            ] else mel_input[idx].data.cpu().numpy()
-            align_img = alignments[idx].data.cpu().numpy()
+            # direct pass on model for spec predictions
+            spec_pred, *_ = model.inference(text_input[:1], text_lengths[:1])
+            spec_pred = spec_pred.permute(0, 2, 1)
+            gt_spec = mel_input.permute(0, 2, 1)
+
+            const_spec = spec_pred[0].data.cpu().numpy()
+            gt_spec = gt_spec[0].data.cpu().numpy()
+            align_img = alignments[0].data.cpu().numpy()
 
             eval_figures = {
                 "prediction": plot_spectrogram(const_spec, ap),
@@ -375,18 +348,11 @@ def evaluate(model, criterion, ap, global_step, epoch):
             }
 
             # Sample audio
-            if c.model in ["Tacotron", "TacotronGST"]:
-                eval_audio = ap.inv_spectrogram(const_spec.T)
-            else:
-                eval_audio = ap.inv_melspectrogram(const_spec.T)
+            eval_audio = ap.inv_melspectrogram(const_spec.T)
             tb_logger.tb_eval_audios(global_step, {"ValAudio": eval_audio},
                                      c.audio["sample_rate"])
 
             # Plot Validation Stats
-
-            if c.bidirectional_decoder or c.double_decoder_consistency:
-                align_b_img = alignments_backward[idx].data.cpu().numpy()
-                eval_figures['alignment2'] = plot_alignment(align_b_img)
             tb_logger.tb_eval_stats(global_step, keep_avg.avg_values)
             tb_logger.tb_eval_figures(global_step, eval_figures)
 
@@ -486,26 +452,17 @@ def main(args):  # pylint: disable=redefined-outer-name
     else:
         num_speakers = 0
 
+    # setup model
     model = setup_model(num_chars, num_speakers, c)
-
-    params = set_weight_decay(model, c.wd)
-    optimizer = RAdam(params, lr=c.lr, weight_decay=0)
-    if c.stopnet and c.separate_stopnet:
-        optimizer_st = RAdam(model.decoder.stopnet.parameters(),
-                             lr=c.lr,
-                             weight_decay=0)
-    else:
-        optimizer_st = None
-
-    # setup criterion
-    criterion = TacotronLoss(c, stopnet_pos_weight=10.0, ga_sigma=0.4)
+    optimizer = RAdam(model.parameters(), lr=c.lr, weight_decay=0, betas=(0.9, 0.98), eps=1e-9)
+    criterion = GlowTTSLoss()
 
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
         try:
             # TODO: fix optimizer init, model.cuda() needs to be called before
             # optimizer restore
-            # optimizer.load_state_dict(checkpoint['optimizer'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
             if c.reinit_layers:
                 raise RuntimeError
             model.load_state_dict(checkpoint['model'])
@@ -516,7 +473,7 @@ def main(args):  # pylint: disable=redefined-outer-name
             model.load_state_dict(model_dict)
             del model_dict
         for group in optimizer.param_groups:
-            group['lr'] = c.lr
+            group['initial_lr'] = c.lr
         print(" > Model restored from step %d" % checkpoint['step'],
               flush=True)
         args.restore_step = checkpoint['step']
@@ -545,24 +502,17 @@ def main(args):  # pylint: disable=redefined-outer-name
         best_loss = float('inf')
 
     global_step = args.restore_step
+    model = data_depended_init(model, ap)
     for epoch in range(0, c.epochs):
         c_logger.print_epoch_start(epoch, c.epochs)
-        # set gradual training
-        if c.gradual_training is not None:
-            r, c.batch_size = gradual_training_scheduler(global_step, c)
-            c.r = r
-            model.decoder.set_r(r)
-            if c.bidirectional_decoder:
-                model.decoder_backward.set_r(r)
-            print("\n > Number of output frames:", model.decoder.r)
         train_avg_loss_dict, global_step = train(model, criterion, optimizer,
-                                                 optimizer_st, scheduler, ap,
-                                                 global_step, epoch)
+                                                 scheduler, ap, global_step,
+                                                 epoch)
         eval_avg_loss_dict = evaluate(model, criterion, ap, global_step, epoch)
         c_logger.print_epoch_end(epoch, eval_avg_loss_dict)
-        target_loss = train_avg_loss_dict['avg_postnet_loss']
+        target_loss = train_avg_loss_dict['avg_loss']
         if c.run_eval:
-            target_loss = eval_avg_loss_dict['avg_postnet_loss']
+            target_loss = eval_avg_loss_dict['avg_loss']
         best_loss = save_best_model(target_loss, best_loss, model, optimizer, global_step, epoch, c.r,
                                     OUT_PATH)
 
@@ -613,7 +563,7 @@ if __name__ == '__main__':
 
     # setup output paths and read configs
     c = load_config(args.config_path)
-    check_config(c)
+    # check_config(c)
     _ = os.path.dirname(os.path.realpath(__file__))
 
     OUT_PATH = args.continue_path

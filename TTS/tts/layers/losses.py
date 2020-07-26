@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import torch
 from torch import nn
@@ -244,3 +245,20 @@ class TacotronLoss(torch.nn.Module):
         return_dict['loss'] = loss
         return return_dict
 
+
+class GlowTTSLoss(torch.nn.Module):
+    def __init__(self):
+        super(GlowTTSLoss, self).__init__()
+        self.constant_factor = 0.5 * math.log(2 * math.pi)
+
+    def forward(self, z, means, scales, log_det, y_lengths, o_dur_log, o_attn_dur, x_lengths):
+        return_dict = {}
+        # flow loss
+        pz = torch.sum(scales) + 0.5 * torch.sum(torch.exp(-2 * scales) * (z - means)**2)
+        log_mle = (self.constant_factor +  pz - torch.sum(log_det)) / (torch.sum(y_lengths) * means.shape[1])
+        # duration loss
+        loss_dur = torch.sum((o_dur_log - o_attn_dur)**2) / torch.sum(x_lengths)
+        return_dict['loss'] = log_mle + loss_dur
+        return_dict['log_mle'] = log_mle
+        return_dict['loss_dur'] = loss_dur
+        return return_dict

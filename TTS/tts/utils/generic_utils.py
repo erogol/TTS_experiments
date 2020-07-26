@@ -1,3 +1,4 @@
+import re
 import os
 import glob
 import torch
@@ -13,7 +14,7 @@ from TTS.utils.generic_utils import check_argument
 
 def split_dataset(items):
     is_multi_speaker = False
-    speakers = [item[-1] for item in items]
+    speakers = [item[2] for item in items]
     is_multi_speaker = len(set(speakers)) > 1
     eval_split_size = 500 if len(items) * 0.01 > 500 else int(
         len(items) * 0.01)
@@ -49,10 +50,15 @@ def sequence_mask(sequence_length, max_len=None):
     return seq_range_expand < seq_length_expand
 
 
+def to_camel(text):
+    text = text.capitalize()
+    return re.sub(r'(?!^)_([a-zA-Z])', lambda m: m.group(1).upper(), text)
+
+
 def setup_model(num_chars, num_speakers, c):
     print(" > Using model: {}".format(c.model))
     MyModel = importlib.import_module('TTS.tts.models.' + c.model.lower())
-    MyModel = getattr(MyModel, c.model)
+    MyModel = getattr(MyModel, to_camel(c.model))
     if c.model.lower() in "tacotron":
         model = MyModel(num_chars=num_chars,
                         num_speakers=num_speakers,
@@ -96,6 +102,32 @@ def setup_model(num_chars, num_speakers, c):
                         bidirectional_decoder=c.bidirectional_decoder,
                         double_decoder_consistency=c.double_decoder_consistency,
                         ddc_r=c.ddc_r)
+    elif c.model.lower() == "glow_tts":
+        model = MyModel(num_chars=num_chars,
+                        hidden_channels=192,
+                        filter_channels=768,
+                        filter_channels_dp=256,
+                        out_channels=80,
+                        kernel_size=3,
+                        num_heads=2,
+                        num_layers_enc=6,
+                        dropout_p=0.1,
+                        num_blocks_dec=12,
+                        kernel_size_dec=5,
+                        dilation_rate=1,
+                        num_block_layers=4,
+                        dropout_p_dec=0.05,
+                        num_speakers=num_speakers,
+                        c_in_channels=0,
+                        num_splits=4,
+                        num_sqz=2,
+                        sigmoid_scale=False,
+                        rel_attn_winndow_size=4,
+                        input_length=None,
+                        mean_only=True,
+                        hidden_channels_enc=192,
+                        hidden_channels_dec=192,
+                        prenet=True)
     return model
 
 class KeepAverage():
@@ -138,7 +170,7 @@ class KeepAverage():
 
 
 def check_config(c):
-    check_argument('model', c, enum_list=['tacotron', 'tacotron2'], restricted=True, val_type=str)
+    check_argument('model', c, enum_list=['tacotron', 'tacotron2', 'glow_tts'], restricted=True, val_type=str)
     check_argument('run_name', c, restricted=True, val_type=str)
     check_argument('run_description', c, val_type=str)
 
