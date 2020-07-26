@@ -16,10 +16,22 @@ def load_meta_data(datasets):
         preprocessor = get_preprocessor_by_name(name)
 
         meta_data_train = preprocessor(root_path, meta_file_train)
+
+        if "path_for_attn" in dataset.keys():
+            new_meta_data_train = []
+            for item in meta_data_train:
+                filename = os.path.basename(item[1])
+                filename = filename.replace('.wav', '.npy')
+                attn_file_path = os.path.join(dataset['path_for_attn'], filename)
+                item.append(attn_file_path)
+                new_meta_data_train.append(item)
+            meta_data_train = new_meta_data_train
+
         if meta_file_val is None:
             meta_data_eval, meta_data_train = split_dataset(meta_data_train)
         else:
             meta_data_eval = preprocessor(root_path, meta_file_val)
+
         meta_data_train_all += meta_data_train
         meta_data_eval_all += meta_data_eval
     return meta_data_train_all, meta_data_eval_all
