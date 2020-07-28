@@ -12,7 +12,6 @@ def fused_add_tanh_sigmoid_multiply(input_a, input_b, n_channels):
     acts = t_act * s_act
     return acts
 
-
 class ConvGroupNorm(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, kernel_size,
                  num_layers, dropout_p):

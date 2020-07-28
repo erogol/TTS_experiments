@@ -32,6 +32,34 @@ def check_update(model, grad_clip, ignore_stopnet=False):
     return grad_norm, skip_flag
 
 
+
+def check_update(model, grad_clip, ignore_stopnet=False, amp_opt_params=None):
+    r'''Check model gradient against unexpected jumps and failures'''
+    skip_flag = False
+    if ignore_stopnet:
+        if not amp_opt_params:
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                [param for name, param in model.named_parameters() if 'stopnet' not in name], grad_clip)
+        else:
+            grad_norm = torch.nn.utils.clip_grad_norm_(amp_opt_params, grad_clip)
+    else:
+        if not amp_opt_params:
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+        else:
+            grad_norm = torch.nn.utils.clip_grad_norm_(amp_opt_params, grad_clip)
+
+    # compatibility with different torch versions
+    if isinstance(grad_norm, float):
+        if np.isinf(grad_norm):
+            print(" | > Gradient is INF !!")
+            skip_flag = True
+    else:
+        if torch.isinf(grad_norm):
+            print(" | > Gradient is INF !!")
+            skip_flag = True
+    return grad_norm, skip_flag
+
+
 def lr_decay(init_lr, global_step, warmup_steps):
     r'''from https://github.com/r9y9/tacotron_pytorch/blob/master/train.py'''
     warmup_steps = float(warmup_steps)

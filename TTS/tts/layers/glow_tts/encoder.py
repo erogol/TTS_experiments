@@ -24,7 +24,7 @@ class Encoder(nn.Module):
                  rel_attn_window_size=None,
                  input_length=None,
                  mean_only=False,
-                 use_prenet=False,
+                 use_prenet=True,
                  c_in_channels=0):
 
         super().__init__()

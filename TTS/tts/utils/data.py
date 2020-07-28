@@ -24,10 +24,24 @@ def _pad_tensor(x, length):
 
 
 def prepare_tensor(inputs, out_steps):
-    max_len = max((x.shape[1] for x in inputs))
-    remainder = max_len % out_steps
-    pad_len = max_len + (out_steps - remainder) if remainder > 0 else max_len
-    return np.stack([_pad_tensor(x, pad_len) for x in inputs])
+    """Convert given list of items into a Tensor with max length padding.
+    Also add residual padding for number of output steps of the model.
+    Args:
+        inputs (list): list of numpy arrays.
+        out_steps (int): number our output steps for the model.
+    """
+    if len(inputs[0].shape) == 2:
+        max_len = max((x.shape[1] for x in inputs))
+        remainder = max_len % out_steps
+        pad_len = max_len + (out_steps - remainder) if remainder > 0 else max_len
+        return np.stack([_pad_tensor(x, pad_len) for x in inputs])
+    elif len(inputs[0].shape) == 1:
+        max_len = max((x.shape[0] for x in inputs))
+        remainder = max_len % out_steps
+        pad_len = max_len + (out_steps - remainder) if remainder > 0 else max_len
+        return np.stack([_pad_data(x, pad_len) for x in inputs])
+    else:
+        raise RuntimeError(" [!] data shape is not valid.")
 
 
 def _pad_stop_target(x, length):

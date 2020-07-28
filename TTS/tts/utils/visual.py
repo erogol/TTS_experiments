@@ -41,6 +41,18 @@ def plot_spectrogram(spectrogram, ap=None, fig_size=(16, 10)):
     return fig
 
 
+def plot_f0(f0, fig_size=(16, 10)):
+    if isinstance(f0, torch.Tensor):
+        f0_ = f0.detach().cpu().numpy().squeeze()
+    else:
+        f0_ = f0.T
+    fig = plt.figure(figsize=fig_size)
+    plt.plot(f0_)
+    plt.title('F0 values')
+    plt.tight_layout()
+    return fig
+
+
 def visualize(alignment, postnet_output, stop_tokens, text, hop_length, CONFIG, decoder_output=None, output_path=None, figsize=(8, 24)):
     if decoder_output is not None:
         num_plot = 4

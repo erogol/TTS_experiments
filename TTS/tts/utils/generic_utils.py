@@ -112,7 +112,7 @@ def setup_model(num_chars, num_speakers, c):
                         num_heads=2,
                         num_layers_enc=6,
                         dropout_p=0.1,
-                        num_blocks_dec=12,
+                        num_flow_blocks_dec=12,
                         kernel_size_dec=5,
                         dilation_rate=1,
                         num_block_layers=4,
@@ -122,12 +122,12 @@ def setup_model(num_chars, num_speakers, c):
                         num_splits=4,
                         num_sqz=2,
                         sigmoid_scale=False,
-                        rel_attn_winndow_size=4,
+                        rel_attn_window_size=4,
                         input_length=None,
                         mean_only=True,
                         hidden_channels_enc=192,
                         hidden_channels_dec=192,
-                        prenet=True)
+                        use_encoder_prenet=True)
     return model
 
 class KeepAverage():

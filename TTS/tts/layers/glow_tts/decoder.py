@@ -47,20 +47,21 @@ class Decoder(nn.Module):
                  hidden_channels,
                  kernel_size,
                  dilation_rate,
-                 num_blocks,
+                 num_flow_blocks,
                  num_coupling_layers,
                  dropout_p=0.,
                  num_splits=4,
                  num_sqz=2,
                  sigmoid_scale=False,
-                 c_in_channels=0):
+                 c_in_channels=0,
+                 feat_channels=None):
         super().__init__()
 
         self.in_channels = in_channels
         self.hidden_channels = hidden_channels
         self.kernel_size = kernel_size
         self.dilation_rate = dilation_rate
-        self.num_blocks = num_blocks
+        self.num_flow_blocks = num_flow_blocks
         self.num_coupling_layers = num_coupling_layers
         self.dropout_p = dropout_p
         self.num_splits = num_splits
@@ -69,7 +70,7 @@ class Decoder(nn.Module):
         self.c_in_channels = c_in_channels
 
         self.flows = nn.ModuleList()
-        for _ in range(num_blocks):
+        for _ in range(num_flow_blocks):
             self.flows.append(ActNorm(channels=in_channels * num_sqz))
             self.flows.append(
                 InvConvNear(channels=in_channels * num_sqz,
@@ -84,7 +85,7 @@ class Decoder(nn.Module):
                               dropout_p=dropout_p,
                               sigmoid_scale=sigmoid_scale))
 
-    def forward(self, x, x_mask, g=None, reverse=False):
+    def forward(self, x, x_mask, feats=None, g=None, reverse=False):
         if not reverse:
             flows = self.flows
             logdet_tot = 0

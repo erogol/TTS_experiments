@@ -47,7 +47,7 @@ class GlowTts(nn.Module):
                  num_heads=2,
                  num_layers_enc=6,
                  dropout_p=0.,
-                 num_blocks_dec=12,
+                 num_flow_blocks_dec=12,
                  kernel_size_dec=5,
                  dilation_rate=5,
                  num_block_layers=4,
@@ -62,8 +62,7 @@ class GlowTts(nn.Module):
                  mean_only=False,
                  hidden_channels_enc=None,
                  hidden_channels_dec=None,
-                 use_prenet=False,
-                 **kwargs):
+                 use_encoder_prenet=False):
 
         super().__init__()
         self.num_chars = num_chars
@@ -75,7 +74,7 @@ class GlowTts(nn.Module):
         self.num_heads = num_heads
         self.num_layers_enc = num_layers_enc
         self.dropout_p = dropout_p
-        self.num_blocks_dec = num_blocks_dec
+        self.num_flow_blocks_dec = num_flow_blocks_dec
         self.kernel_size_dec = kernel_size_dec
         self.dilation_rate = dilation_rate
         self.num_block_layers = num_block_layers
@@ -90,7 +89,7 @@ class GlowTts(nn.Module):
         self.mean_only = mean_only
         self.hidden_channels_enc = hidden_channels_enc
         self.hidden_channels_dec = hidden_channels_dec
-        self.use_prenet = use_prenet
+        self.use_encoder_prenet = use_encoder_prenet
 
         self.encoder = Encoder(num_chars,
                                out_channels,
@@ -104,14 +103,14 @@ class GlowTts(nn.Module):
                                rel_attn_window_size=rel_attn_window_size,
                                input_length=input_length,
                                mean_only=mean_only,
-                               use_prenet=use_prenet,
+                               use_prenet=use_encoder_prenet,
                                c_in_channels=c_in_channels)
 
         self.decoder = Decoder(out_channels,
                                hidden_channels_dec or hidden_channels,
                                kernel_size_dec,
                                dilation_rate,
-                               num_blocks_dec,
+                               num_flow_blocks_dec,
                                num_block_layers,
                                dropout_p=dropout_p_dec,
                                num_splits=num_splits,
@@ -151,8 +150,8 @@ class GlowTts(nn.Module):
                                                               x_lengths,
                                                               g=g)
         # format feature vectors and feature vector lenghts
-        y, y_lengths, y_max_length, attn = self.preprocess(y, y_lengths,
-                                                     y_max_length, attn)
+        y, y_lengths, y_max_length, attn = self.preprocess(
+            y, y_lengths, y_max_length, attn)
         y_mask = torch.unsqueeze(sequence_mask(y_lengths), 1).to(x_mask.dtype)
         attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
         # decoder pass
@@ -164,13 +163,14 @@ class GlowTts(nn.Module):
                 o_scale = torch.exp(-2 * o_log_scale)
                 # compute raw probabilities
                 logp1 = torch.sum(-0.5 * math.log(2 * math.pi) - o_log_scale,
-                                [1]).unsqueeze(-1)  # [b, t, 1]
-                logp2 = torch.matmul(o_scale.transpose(1, 2), -0.5 *
-                                    (z**2))  # [b, t, d] x [b, d, t'] = [b, t, t']
+                                  [1]).unsqueeze(-1)  # [b, t, 1]
+                logp2 = torch.matmul(
+                    o_scale.transpose(1, 2),
+                    -0.5 * (z**2))  # [b, t, d] x [b, d, t'] = [b, t, t']
                 logp3 = torch.matmul((o_mean * o_scale).transpose(1, 2),
-                                    z)  # [b, t, d] x [b, d, t'] = [b, t, t']
+                                     z)  # [b, t, d] x [b, d, t'] = [b, t, t']
                 logp4 = torch.sum(-0.5 * (o_mean**2) * o_scale,
-                                [1]).unsqueeze(-1)  # [b, t, 1]
+                                  [1]).unsqueeze(-1)  # [b, t, 1]
                 logp = logp1 + logp2 + logp3 + logp4  # [b, t, t']
 
                 attn = maximum_path(logp,

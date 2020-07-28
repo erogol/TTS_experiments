@@ -255,7 +255,7 @@ class GlowTTSLoss(torch.nn.Module):
         return_dict = {}
         # flow loss
         pz = torch.sum(scales) + 0.5 * torch.sum(torch.exp(-2 * scales) * (z - means)**2)
-        log_mle = (self.constant_factor +  pz - torch.sum(log_det)) / (torch.sum(y_lengths) * means.shape[1])
+        log_mle = self.constant_factor +  (pz - torch.sum(log_det)) / (torch.sum(y_lengths // 2) * 2 * 80)
         # duration loss
         loss_dur = torch.sum((o_dur_log - o_attn_dur)**2) / torch.sum(x_lengths)
         return_dict['loss'] = log_mle + loss_dur
