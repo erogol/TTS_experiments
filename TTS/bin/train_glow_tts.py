@@ -131,6 +131,7 @@ def data_depended_init(model, ap):
             # forward pass model
             _ = model.forward(
                 text_input, text_lengths, mel_input, mel_lengths, attn_mask)
+            break
 
     for f in model.decoder.flows:
         if getattr(f, "set_ddi", False):
@@ -139,7 +140,7 @@ def data_depended_init(model, ap):
 
 
 def train(model, criterion, optimizer, scheduler,
-          ap, global_step, epoch):
+          ap, global_step, epoch, amp):
     data_loader = setup_loader(ap, 1, is_val=False,
                                verbose=(epoch == 0))
     model.train()
@@ -158,6 +159,7 @@ def train(model, criterion, optimizer, scheduler,
         # format data
         text_input, text_lengths, mel_input, mel_lengths, speaker_ids,\
             avg_text_length, avg_spec_length, attn_mask = format_data(data)
+
         loader_time = time.time() - end_time
 
         global_step += 1
@@ -176,8 +178,17 @@ def train(model, criterion, optimizer, scheduler,
                               o_dur_log, o_total_dur, text_lengths)
 
         # backward pass
-        loss_dict['loss'].backward()
-        grad_norm, _ = check_update(model, c.grad_clip, ignore_stopnet=True)
+        if amp is not None:
+            with amp.scale_loss( loss_dict['loss'], optimizer) as scaled_loss:
+                scaled_loss.backward()
+        else:
+            loss_dict['loss'].backward()
+
+        if amp:
+            amp_opt_params = amp.master_params(optimizer)
+        else:
+            amp_opt_params = None
+        grad_norm, _ = check_update(model, c.grad_clip, ignore_stopnet=True, amp_opt_params=amp_opt_params)
         optimizer.step()
 
         # current_lr
@@ -236,7 +247,8 @@ def train(model, criterion, optimizer, scheduler,
                 if c.checkpoint:
                     # save model
                     save_checkpoint(model, optimizer, global_step, epoch, 1, OUT_PATH,
-                                    model_loss=loss_dict['loss'])
+                                    model_loss=loss_dict['loss'],
+                                    amp_state_dict=amp.state_dict() if amp else None)
 
                 # Diagnostic visualizations
                 # direct pass on model for spec predictions
@@ -457,6 +469,14 @@ def main(args):  # pylint: disable=redefined-outer-name
     optimizer = RAdam(model.parameters(), lr=c.lr, weight_decay=0, betas=(0.9, 0.98), eps=1e-9)
     criterion = GlowTTSLoss()
 
+    if c.apex_amp_level:
+        # pylint: disable=import-outside-toplevel
+        from apex import amp
+        model.cuda()
+        model, optimizer = amp.initialize(model, optimizer, opt_level=c.apex_amp_level)
+    else:
+        amp = None
+
     if args.restore_path:
         checkpoint = torch.load(args.restore_path, map_location='cpu')
         try:
@@ -472,6 +492,10 @@ def main(args):  # pylint: disable=redefined-outer-name
             model_dict = set_init_dict(model_dict, checkpoint['model'], c)
             model.load_state_dict(model_dict)
             del model_dict
+
+        if amp and 'amp' in checkpoint:
+            amp.load_state_dict(checkpoint['amp'])
+
         for group in optimizer.param_groups:
             group['initial_lr'] = c.lr
         print(" > Model restored from step %d" % checkpoint['step'],
@@ -507,14 +531,14 @@ def main(args):  # pylint: disable=redefined-outer-name
         c_logger.print_epoch_start(epoch, c.epochs)
         train_avg_loss_dict, global_step = train(model, criterion, optimizer,
                                                  scheduler, ap, global_step,
-                                                 epoch)
+                                                 epoch, amp)
         eval_avg_loss_dict = evaluate(model, criterion, ap, global_step, epoch)
         c_logger.print_epoch_end(epoch, eval_avg_loss_dict)
         target_loss = train_avg_loss_dict['avg_loss']
         if c.run_eval:
             target_loss = eval_avg_loss_dict['avg_loss']
         best_loss = save_best_model(target_loss, best_loss, model, optimizer, global_step, epoch, c.r,
-                                    OUT_PATH)
+                                    OUT_PATH, amp_state_dict=amp.state_dict() if amp else None)
 
 
 if __name__ == '__main__':
@@ -565,6 +589,9 @@ if __name__ == '__main__':
     c = load_config(args.config_path)
     # check_config(c)
     _ = os.path.dirname(os.path.realpath(__file__))
+
+    if c.apex_amp_level:
+        print("   >  apex AMP level: ", c.apex_amp_level)
 
     OUT_PATH = args.continue_path
     if args.continue_path == '':
