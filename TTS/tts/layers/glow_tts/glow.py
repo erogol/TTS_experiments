@@ -222,7 +222,7 @@ class InvConvNear(nn.Module):
             torch.FloatTensor(self.num_splits, self.num_splits).normal_())[0]
         if torch.det(w_init) < 0:
             w_init[:, 0] = -1 * w_init[:, 0]
-        self.weight = nn.Parameter(w_init)
+        self.weight = nn.Parameter(w_init.contiguous())
 
     def forward(self, x, x_mask=None, reverse=False, g=None):
         """Split the input into groups of size self.num_splits and

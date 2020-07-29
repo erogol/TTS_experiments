@@ -11,13 +11,13 @@ import traceback
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from TTS.tts.datasets.preprocess import load_meta_data
 from TTS.tts.datasets.TTSDataset import MyDataset
 from TTS.tts.layers.losses import GlowTTSLoss
 from TTS.tts.utils.console_logger import ConsoleLogger
 from TTS.tts.utils.distribute import (DistributedSampler,
-                                      apply_gradient_allreduce,
                                       init_distributed, reduce_tensor)
 from TTS.tts.utils.generic_utils import check_config, setup_model
 from TTS.tts.utils.io import save_best_model, save_checkpoint
@@ -113,10 +113,14 @@ def format_data(data):
 
 def data_depended_init(model, ap):
     """Data depended initialization for normalization layers."""
-
-    for f in model.decoder.flows:
-        if getattr(f, "set_ddi", False):
-            f.set_ddi(True)
+    if hasattr(model, 'module'):
+        for f in model.module.decoder.flows:
+            if getattr(f, "set_ddi", False):
+                f.set_ddi(True)
+    else:
+         for f in model.decoder.flows:
+            if getattr(f, "set_ddi", False):
+                f.set_ddi(True)
 
     data_loader = setup_loader(ap, 1, is_val=False)
     model.train()
@@ -133,9 +137,14 @@ def data_depended_init(model, ap):
                 text_input, text_lengths, mel_input, mel_lengths, attn_mask)
             break
 
-    for f in model.decoder.flows:
-        if getattr(f, "set_ddi", False):
-            f.set_ddi(False)
+    if hasattr(model, 'module'):
+        for f in model.module.decoder.flows:
+            if getattr(f, "set_ddi", False):
+                f.set_ddi(False)
+    else:
+         for f in model.decoder.flows:
+            if getattr(f, "set_ddi", False):
+                f.set_ddi(False)
     return model
 
 
@@ -472,6 +481,7 @@ def main(args):  # pylint: disable=redefined-outer-name
     if c.apex_amp_level:
         # pylint: disable=import-outside-toplevel
         from apex import amp
+        from apex.parallel import DistributedDataParallel as DDP
         model.cuda()
         model, optimizer = amp.initialize(model, optimizer, opt_level=c.apex_amp_level)
     else:
@@ -510,7 +520,7 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     # DISTRUBUTED
     if num_gpus > 1:
-        model = apply_gradient_allreduce(model)
+        model = DDP(model)
 
     if c.noam_schedule:
         scheduler = NoamLR(optimizer,
