@@ -354,7 +354,10 @@ def evaluate(model, criterion, ap, global_step, epoch):
         if args.rank == 0:
             # Diagnostic visualizations
             # direct pass on model for spec predictions
-            spec_pred, *_ = model.inference(text_input[:1], text_lengths[:1])
+            if hasattr(model, 'module'):
+                spec_pred, *_ = model.module.inference(text_input[:1], text_lengths[:1])
+            else:
+                spec_pred, *_ = model.inference(text_input[:1], text_lengths[:1])
             spec_pred = spec_pred.permute(0, 2, 1)
             gt_spec = mel_input.permute(0, 2, 1)
 
