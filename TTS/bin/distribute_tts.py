@@ -14,6 +14,10 @@ def main():
     Call train.py as a new process and pass command arguments
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument('--train_script',
+        type=str,
+        help='Target train script to distribute.',
+        default='train_tts.py')
     parser.add_argument(
         '--continue_path',
         type=str,
@@ -38,7 +42,7 @@ def main():
 
     # set arguments for train.py
     folder_path =pathlib.Path(__file__).parent.absolute()
-    command = [os.path.join(folder_path,'train_tts.py')]
+    command = [os.path.join(folder_path, args.train_script)]
     command.append('--continue_path={}'.format(args.continue_path))
     command.append('--restore_path={}'.format(args.restore_path))
     command.append('--config_path={}'.format(args.config_path))
