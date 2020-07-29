@@ -5,7 +5,10 @@ import datetime
 
 def load_checkpoint(model, checkpoint_path, use_cuda=False):
     state = torch.load(checkpoint_path, map_location=torch.device('cpu'))
-    model.load_state_dict(state['model'])
+    if hasattr(model, 'module'):
+        model.module.load_state_dict(state['model'])
+    else:
+        model.load_state_dict(state['model'])
     if use_cuda:
         model.cuda()
     # set model stepsize
@@ -15,7 +18,10 @@ def load_checkpoint(model, checkpoint_path, use_cuda=False):
 
 
 def save_model(model, optimizer, current_step, epoch, r, output_path, **kwargs):
-    new_state_dict = model.state_dict()
+    if hasattr(model, 'module'):
+        new_state_dict = model.module.state_dict()
+    else:
+        new_state_dict = model.state_dict()
     state = {
         'model': new_state_dict,
         'optimizer': optimizer.state_dict() if optimizer is not None else None,

@@ -79,10 +79,14 @@ def init_distributed(rank, num_gpus, group_name, dist_backend, dist_url):
 def apply_gradient_allreduce(module):
 
     # sync model parameters
-    for p in module.state_dict().values():
-        if not torch.is_tensor(p):
+    for key ,v in module.state_dict().items():
+        if not torch.is_tensor(v):
             continue
-        dist.broadcast(p, 0)
+        try:
+            dist.broadcast(v, 0)
+        except:
+            print(key)
+            print(v.shape)
 
     def allreduce_params():
         if module.needs_reduction:
