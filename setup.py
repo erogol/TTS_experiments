@@ -9,8 +9,17 @@ import numpy
 
 import setuptools.command.build_py
 import setuptools.command.develop
-from Cython.Build import cythonize
 from setuptools import find_packages, setup
+
+# handle import if cython is not already installed.
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    # create closure for deferred import
+    def cythonize (*args, ** kwargs ):
+        from Cython.Build import cythonize
+        return cythonize(*args, ** kwargs)
+
 
 parser = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
 parser.add_argument('--checkpoint', type=str, help='Path to checkpoint file to embed in wheel.')
@@ -103,6 +112,7 @@ requirements = {
         "tqdm",
         "inflect",
         "pysbd",
+        "cython",
         "bokeh==1.4.0",
         "pysbd",
         "soundfile",

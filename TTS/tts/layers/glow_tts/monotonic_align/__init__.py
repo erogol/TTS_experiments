@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch.nn import functional as F
 from TTS.tts.utils.generic_utils import sequence_mask
 from TTS.tts.layers.glow_tts.monotonic_align.core import maximum_path_c
 
