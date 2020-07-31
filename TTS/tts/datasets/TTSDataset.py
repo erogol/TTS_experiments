@@ -24,6 +24,7 @@ class MyDataset(Dataset):
                  phoneme_cache_path=None,
                  phoneme_language="en-us",
                  enable_eos_bos=False,
+                 add_noise=False,
                  verbose=False):
         """
         Args:
@@ -42,6 +43,7 @@ class MyDataset(Dataset):
             phoneme_language (str): one the languages from
                 https://github.com/bootphon/phonemizer#languages
             enable_eos_bos (bool): enable end of sentence and beginning of sentences characters.
+            add_noise(bool): if true add random values between [0, 1] to the audio array.
             verbose (bool): print diagnostic information.
         """
         self.batch_group_size = batch_group_size
@@ -58,6 +60,7 @@ class MyDataset(Dataset):
         self.phoneme_cache_path = phoneme_cache_path
         self.phoneme_language = phoneme_language
         self.enable_eos_bos = enable_eos_bos
+        self.add_noise = add_noise
         self.verbose = verbose
         if use_phonemes and not os.path.isdir(phoneme_cache_path):
             os.makedirs(phoneme_cache_path, exist_ok=True)
@@ -70,7 +73,7 @@ class MyDataset(Dataset):
         self.sort_items()
 
     def load_wav(self, filename):
-        audio = self.ap.load_wav(filename)
+        audio = self.ap.load_wav(filename, add_noise=self.add_noise)
         return audio
 
     @staticmethod

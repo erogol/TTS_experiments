@@ -34,6 +34,7 @@ class AudioProcessor(object):
                  trim_db=60,
                  do_sound_norm=False,
                  stats_path=None,
+                 max_wav_value=32767,
                  **_):
 
         print(" > Setting up Audio Processor...")
@@ -60,6 +61,7 @@ class AudioProcessor(object):
         self.trim_db = trim_db
         self.do_sound_norm = do_sound_norm
         self.stats_path = stats_path
+        self.max_wav_value = max_wav_value
         # setup stft parameters
         if hop_length is None:
             # compute stft parameters from given time values
@@ -322,11 +324,15 @@ class AudioProcessor(object):
         return x / abs(x).max() * 0.9
 
     ### save and load ###
-    def load_wav(self, filename, sr=None):
+    def load_wav(self, filename, sr=None, add_noise=False):
         if sr is None:
             x, sr = sf.read(filename)
         else:
             x, sr = librosa.load(filename, sr=sr)
+
+        if add_noise:
+            x += np.random.rand(x.shape[0]) / self.max_wav_value
+
         if self.do_trim_silence:
             try:
                 x = self.trim_silence(x)
@@ -338,7 +344,7 @@ class AudioProcessor(object):
         return x
 
     def save_wav(self, wav, path):
-        wav_norm = wav * (32767 / max(0.01, np.max(np.abs(wav))))
+        wav_norm = wav * (self.max_wav_value / max(0.01, np.max(np.abs(wav))))
         scipy.io.wavfile.write(path, self.sample_rate, wav_norm.astype(np.int16))
 
     @staticmethod

@@ -41,7 +41,7 @@ from TTS.utils.training import (NoamLR, adam_weight_decay, check_update,
 use_cuda, num_gpus = setup_torch_training_env(True, False)
 
 
-def setup_loader(ap, r, is_val=False, verbose=False):
+def setup_loader(ap, r, is_val=False, verbose=False, add_noise=False):
     if is_val and not c.run_eval:
         loader = None
     else:
@@ -60,6 +60,7 @@ def setup_loader(ap, r, is_val=False, verbose=False):
             use_phonemes=c.use_phonemes,
             phoneme_language=c.phoneme_language,
             enable_eos_bos=c.enable_eos_bos_chars,
+            add_noise=add_noise,
             verbose=verbose)
         sampler = DistributedSampler(dataset) if num_gpus > 1 else None
         loader = DataLoader(
@@ -151,7 +152,8 @@ def data_depended_init(model, ap):
 def train(model, criterion, optimizer, scheduler,
           ap, global_step, epoch, amp):
     data_loader = setup_loader(ap, 1, is_val=False,
-                               verbose=(epoch == 0))
+                               verbose=(epoch == 0),
+                               add_noise=True)
     model.train()
     epoch_time = 0
     keep_avg = KeepAverage()
