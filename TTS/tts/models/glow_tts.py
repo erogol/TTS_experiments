@@ -128,6 +128,7 @@ class GlowTts(nn.Module):
         # format feature vectors and feature vector lenghts
         y, y_lengths, y_max_length, attn = self.preprocess(
             y, y_lengths, y_max_length, attn)
+        # create masks
         y_mask = torch.unsqueeze(sequence_mask(y_lengths), 1).to(x_mask.dtype)
         attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
         # decoder pass
@@ -160,23 +161,25 @@ class GlowTts(nn.Module):
     def inference(self, x, x_lengths, g=None):
         if g is not None:
             g = F.normalize(self.emb_g(g)).unsqueeze(-1)  # [b, h]
+        # pass encoder
         o_mean, o_log_scale, o_dur_log, x_mask = self.encoder(x,
                                                               x_lengths,
                                                               g=g)
-
+        # compute output durations
         w = torch.exp(o_dur_log) * x_mask * self.length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
-
+        # compute masks
         y_mask = torch.unsqueeze(sequence_mask(y_lengths), 1).to(x_mask.dtype)
         attn_mask = torch.unsqueeze(x_mask, -1) * torch.unsqueeze(y_mask, 2)
-
+        # compute attention mask
         attn = generate_path(w_ceil.squeeze(1),
                              attn_mask.squeeze(1)).unsqueeze(1)
         y_mean, y_log_scale, o_attn_dur = self.compute_outputs(
             attn, o_mean, o_log_scale, x_mask)
         z = (y_mean + torch.exp(y_log_scale) * torch.randn_like(y_mean) *
              self.noise_scale) * y_mask
+        # decoder pass
         y, logdet = self.decoder(z, y_mask, g=g, reverse=True)
         attn = attn.squeeze(1).permute(0, 2, 1)
         return y, logdet, y_mean, y_log_scale, attn, o_dur_log, o_attn_dur
