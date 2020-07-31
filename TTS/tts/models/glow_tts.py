@@ -106,8 +106,8 @@ class GlowTts(nn.Module):
         y_log_scale = torch.matmul(
             attn.squeeze(1).transpose(1, 2), o_log_scale.transpose(
                 1, 2)).transpose(1, 2)  # [b, t', t], [b, t, d] -> [b, d, t']
-        # compute total duration with padding masking
-        o_attn_dur = torch.log(1e-8 + torch.sum(attn, -1)) * x_mask
+        # compute total duration with adjustment
+        o_attn_dur = torch.log(1 + torch.sum(attn, -1)) * x_mask
         return y_mean, y_log_scale, o_attn_dur
 
     def forward(self, x, x_lengths, y=None, y_lengths=None, attn=None, g=None):
@@ -166,7 +166,7 @@ class GlowTts(nn.Module):
                                                               x_lengths,
                                                               g=g)
         # compute output durations
-        w = torch.exp(o_dur_log) * x_mask * self.length_scale
+        w = (torch.exp(o_dur_log) - 1) * x_mask * self.length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
         # compute masks
