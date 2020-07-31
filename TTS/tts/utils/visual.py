@@ -53,7 +53,7 @@ def plot_f0(f0, fig_size=(16, 10)):
     return fig
 
 
-def visualize(alignment, postnet_output, stop_tokens, text, hop_length, CONFIG, decoder_output=None, output_path=None, figsize=(8, 24)):
+def visualize(alignment, postnet_output, text, hop_length, CONFIG, stop_tokens=None, decoder_output=None, output_path=None, figsize=(8, 24)):
     if decoder_output is not None:
         num_plot = 4
     else:
@@ -74,8 +74,9 @@ def visualize(alignment, postnet_output, stop_tokens, text, hop_length, CONFIG, 
     plt.yticks(range(len(text)), list(text))
     plt.colorbar()
     # plot stopnet predictions
-    plt.subplot(num_plot, 1, 2)
-    plt.plot(range(len(stop_tokens)), list(stop_tokens))
+    if stop_tokens is not None:
+        plt.subplot(num_plot, 1, 2)
+        plt.plot(range(len(stop_tokens)), list(stop_tokens))
     # plot postnet spectrogram
     plt.subplot(num_plot, 1, 3)
     librosa.display.specshow(postnet_output.T, sr=CONFIG.audio['sample_rate'],

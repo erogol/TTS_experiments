@@ -12,7 +12,7 @@ def load_checkpoint(model, checkpoint_path, use_cuda=False):
     if use_cuda:
         model.cuda()
     # set model stepsize
-    if 'r' in state.keys():
+    if 'r' in state.keys() and hasattr(model.decoder, 'r'):
         model.decoder.set_r(state['r'])
     return model, state
 

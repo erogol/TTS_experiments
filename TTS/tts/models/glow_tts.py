@@ -64,6 +64,8 @@ class GlowTts(nn.Module):
         self.hidden_channels_enc = hidden_channels_enc
         self.hidden_channels_dec = hidden_channels_dec
         self.use_encoder_prenet = use_encoder_prenet
+        self.noise_scale=1.
+        self.length_scale=1.
 
         self.encoder = Encoder(num_chars,
                                out_channels,
@@ -155,14 +157,14 @@ class GlowTts(nn.Module):
         return z, logdet, y_mean, y_log_scale, attn, o_dur_log, o_attn_dur
 
     @torch.no_grad()
-    def inference(self, x, x_lengths, g=None, noise_scale=1., length_scale=1.):
+    def inference(self, x, x_lengths, g=None):
         if g is not None:
             g = F.normalize(self.emb_g(g)).unsqueeze(-1)  # [b, h]
         o_mean, o_log_scale, o_dur_log, x_mask = self.encoder(x,
                                                               x_lengths,
                                                               g=g)
 
-        w = torch.exp(o_dur_log) * x_mask * length_scale
+        w = torch.exp(o_dur_log) * x_mask * self.length_scale
         w_ceil = torch.ceil(w)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
 
@@ -174,7 +176,7 @@ class GlowTts(nn.Module):
         y_mean, y_log_scale, o_attn_dur = self.compute_outputs(
             attn, o_mean, o_log_scale, x_mask)
         z = (y_mean + torch.exp(y_log_scale) * torch.randn_like(y_mean) *
-             noise_scale) * y_mask
+             self.noise_scale) * y_mask
         y, logdet = self.decoder(z, y_mask, g=g, reverse=True)
         attn = attn.squeeze(1).permute(0, 2, 1)
         return y, logdet, y_mean, y_log_scale, attn, o_dur_log, o_attn_dur
