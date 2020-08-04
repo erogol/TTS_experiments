@@ -39,7 +39,6 @@ class ParallelWaveganGenerator(torch.nn.Module):
         self.kernel_size = kernel_size
         self.upsample_factors = upsample_factors
         self.sample_rates = sample_rates
-        self.sample_rate = None
         self.upsample_scale = np.prod(upsample_factors)
 
         self.inference_padding = inference_padding
@@ -55,10 +54,9 @@ class ParallelWaveganGenerator(torch.nn.Module):
                                           bias=True)
 
         # define conv + upsampling network
-        if isinstance(sample_rates, list):
-            self.upsample_net_ids = [(sr, idx) for idx, sr in enumerate(sample_rates)]
-            self.upsample_net_ids = dict(self.upsample_net_ids)
-            self.upsample_nets = torch.nn.ModuleList([ConvUpsample(upsample_factors=upsample_factors) for sr in sample_rates])
+        if isinstance(sample_rates):
+            self.upsample_nets = [(sr, ConvUpsample(upsample_factors=upsample_factors)) for sr in sample_rates]
+            self.upsample_nets = dict(self.upsample_nets)
         else:
             self.upsample_net = ConvUpsample(upsample_factors=upsample_factors)
 
@@ -96,7 +94,7 @@ class ParallelWaveganGenerator(torch.nn.Module):
         if use_weight_norm:
             self.apply_weight_norm()
 
-    def forward(self, c):
+    def forward(self, c, sr=None):
         """
             c: (B, C ,T').
             o: Output tensor (B, out_channels, T)
@@ -106,10 +104,9 @@ class ParallelWaveganGenerator(torch.nn.Module):
         x = x.to(self.first_conv.bias.device)
 
         # perform upsampling
-        if self.sample_rate is not None:
-            if c is not None and self.upsample_nets is not None:
-                layer_id = self.upsample_net_ids[self.sample_rate]
-                c = self.upsample_nets[layer_id](c)
+        if sr is not None:
+            if c is not None and self.upsample_net is not None:
+                c = self.upsample_nets[sr](c)
                 assert c.shape[-1] == x.shape[
                     -1], f" [!] Upsampling scale does not match the expected output. {c.shape} vs {x.shape}"
         else:
@@ -134,11 +131,11 @@ class ParallelWaveganGenerator(torch.nn.Module):
         return x
 
     @torch.no_grad()
-    def inference(self, c):
+    def inference(self, c, sr=None):
         c = c.to(self.first_conv.weight.device)
         c = torch.nn.functional.pad(
             c, (self.inference_padding, self.inference_padding), 'replicate')
-        return self.forward(c)
+        return self.forward(c, sr=sr)
 
     def remove_weight_norm(self):
         def _remove_weight_norm(m):
