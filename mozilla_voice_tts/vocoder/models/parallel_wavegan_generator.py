@@ -27,6 +27,7 @@ class ParallelWaveganGenerator(torch.nn.Module):
                  bias=True,
                  use_weight_norm=True,
                  upsample_factors=[4, 4, 4, 4],
+                 sample_rates=None,
                  inference_padding=2):
 
         super(ParallelWaveganGenerator, self).__init__()
@@ -37,7 +38,9 @@ class ParallelWaveganGenerator(torch.nn.Module):
         self.stacks = stacks
         self.kernel_size = kernel_size
         self.upsample_factors = upsample_factors
+        self.sample_rates = sample_rates
         self.upsample_scale = np.prod(upsample_factors)
+
         self.inference_padding = inference_padding
 
         # check the number of layers and stacks
@@ -51,7 +54,11 @@ class ParallelWaveganGenerator(torch.nn.Module):
                                           bias=True)
 
         # define conv + upsampling network
-        self.upsample_net = ConvUpsample(upsample_factors=upsample_factors)
+        if isinstance(sample_rates):
+            self.upsample_nets = [(sr, ConvUpsample(upsample_factors=upsample_factors)) for sr in sample_rates]
+            self.upsample_nets = dict(self.upsample_nets)
+        else:
+            self.upsample_net = ConvUpsample(upsample_factors=upsample_factors)
 
         # define residual blocks
         self.conv_layers = torch.nn.ModuleList()
@@ -87,7 +94,7 @@ class ParallelWaveganGenerator(torch.nn.Module):
         if use_weight_norm:
             self.apply_weight_norm()
 
-    def forward(self, c):
+    def forward(self, c, sr=None):
         """
             c: (B, C ,T').
             o: Output tensor (B, out_channels, T)
@@ -97,10 +104,16 @@ class ParallelWaveganGenerator(torch.nn.Module):
         x = x.to(self.first_conv.bias.device)
 
         # perform upsampling
-        if c is not None and self.upsample_net is not None:
-            c = self.upsample_net(c)
-            assert c.shape[-1] == x.shape[
-                -1], f" [!] Upsampling scale does not match the expected output. {c.shape} vs {x.shape}"
+        if sr is not None:
+            if c is not None and self.upsample_net is not None:
+                c = self.upsample_nets[sr](c)
+                assert c.shape[-1] == x.shape[
+                    -1], f" [!] Upsampling scale does not match the expected output. {c.shape} vs {x.shape}"
+        else:
+            if c is not None and self.upsample_net is not None:
+                c = self.upsample_net(c)
+                assert c.shape[-1] == x.shape[
+                    -1], f" [!] Upsampling scale does not match the expected output. {c.shape} vs {x.shape}"
 
         # encode to hidden representation
         x = self.first_conv(x)
@@ -118,11 +131,11 @@ class ParallelWaveganGenerator(torch.nn.Module):
         return x
 
     @torch.no_grad()
-    def inference(self, c):
+    def inference(self, c, sr=None):
         c = c.to(self.first_conv.weight.device)
         c = torch.nn.functional.pad(
             c, (self.inference_padding, self.inference_padding), 'replicate')
-        return self.forward(c)
+        return self.forward(c, sr=sr)
 
     def remove_weight_norm(self):
         def _remove_weight_norm(m):
