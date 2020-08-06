@@ -11,7 +11,7 @@
         "frame_shift_ms": null,  // stft window hop-lengh in ms. If null, 'hop_length' is used.
 
         // Audio processing parameters
-        "sample_rate": [16000, 22050, 24000],   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
+        "sample_rate": 22050,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
         "preemphasis": 0.0,     // pre-emphasis to reduce spec noise and make it more structured. If 0.0, no -pre-emphasis.
         "ref_level_db": 0,     // reference level db, theoretically 20db is the sound of air.
 
@@ -101,6 +101,7 @@
 
     // TRAINING
     "batch_size": 6,       // Batch size for training. Lower values than 32 might cause hard to learn attention. It is overwritten by 'gradual_training'.
+    "sampling_rates": [16000, 22050, 24000],  // pick different sampling rate for each iteration to train generic PWGAN model.
 
     // VALIDATION
     "run_eval": true,

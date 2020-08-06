@@ -4,6 +4,7 @@ import os
 import sys
 import time
 import traceback
+import random
 from inspect import signature
 
 import torch
@@ -94,6 +95,15 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         batch_n_iter = int(len(data_loader.dataset) / c.batch_size)
     end_time = time.time()
     c_logger.print_train_start()
+
+    new_sr = None
+    # pick a sampling rate
+    if 'sampling_rates' in c:
+        new_sr = random.choice(c.sampling_rates)
+        ap.sample_rate = new_sr
+        data_loader.dataset.sample_rate = new_sr
+        model_G.sample_rate= new_sr
+
     for num_iter, data in enumerate(data_loader):
         start_time = time.time()
 
@@ -217,6 +227,13 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
                 else:
                     loss_dict[key] = value.item()
 
+        # pick a sampling rate for next iter
+        if 'sampling_rates' in c:
+            new_sr = random.choice(c.sampling_rates)
+            ap.sample_rate = new_sr
+            data_loader.dataset.sample_rate = new_sr
+            model_G.sample_rate= new_sr
+
         step_time = time.time() - start_time
         epoch_time += step_time
 
@@ -302,6 +319,15 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
     keep_avg = KeepAverage()
     end_time = time.time()
     c_logger.print_eval_start()
+
+    new_sr = None
+   # pick a sampling rate for next iter
+    if 'sampling_rates' in c:
+        new_sr = random.choice(c.sampling_rates)
+        ap.sample_rate = new_sr
+        data_loader.dataset.sample_rate = new_sr
+        model_G.sample_rate = new_sr
+
     for num_iter, data in enumerate(data_loader):
         start_time = time.time()
 
@@ -403,6 +429,12 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
                 else:
                     loss_dict[key] = value.item()
 
+        # pick a sampling rate for next iter
+        if 'sampling_rates' in c:
+            new_sr = random.choice(c.sampling_rates)
+            ap.sample_rate = new_sr
+            data_loader.dataset.sample_rate = new_sr
+            model_G.sample_rate= new_sr
 
         step_time = time.time() - start_time
         epoch_time += step_time
