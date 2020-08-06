@@ -81,7 +81,8 @@ def setup_generator(c):
             dropout=0.0,
             bias=True,
             use_weight_norm=True,
-            upsample_factors=c.generator_model_params['upsample_factors'])
+            upsample_factors=c.generator_model_params['upsample_factors'],
+            sample_rates=c.sampling_rates)
     return model
 
 
