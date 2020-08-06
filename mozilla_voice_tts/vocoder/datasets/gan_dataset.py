@@ -24,7 +24,8 @@ class GANDataset(Dataset):
                  return_segments=True,
                  use_noise_augment=False,
                  use_cache=False,
-                 verbose=False):
+                 verbose=False,
+                 sample_rate=None):
 
         self.ap = ap
         self.item_list = items
@@ -37,6 +38,7 @@ class GANDataset(Dataset):
         self.return_segments = return_segments
         self.use_cache = use_cache
         self.use_noise_augment = use_noise_augment
+        self.sample_rate = sample_rate
         self.verbose = verbose
 
         assert seq_len % hop_len == 0, " [!] seq_len has to be a multiple of hop_len."
@@ -82,11 +84,10 @@ class GANDataset(Dataset):
             # compute features from wav
             wavpath = self.item_list[idx]
             # print(wavpath)
-
-            if self.use_cache and self.cache[idx] is not None:
+            if self.use_cache and self.cache[idx] is not None and self.sample_rate is None:
                 audio, mel = self.cache[idx]
             else:
-                audio = self.ap.load_wav(wavpath)
+                audio = self.ap.load_wav(wavpath, sr=self.sample_rate)
 
                 if len(audio) < self.seq_len + self.pad_short:
                     audio = np.pad(audio, (0, self.seq_len + self.pad_short - len(audio)), \
@@ -98,7 +99,7 @@ class GANDataset(Dataset):
             # load precomputed features
             wavpath, feat_path = self.item_list[idx]
 
-            if self.use_cache and self.cache[idx] is not None:
+            if self.use_cache and self.cache[idx] is not None and self.sample_rate is None:
                 audio, mel = self.cache[idx]
             else:
                 audio = self.ap.load_wav(wavpath)

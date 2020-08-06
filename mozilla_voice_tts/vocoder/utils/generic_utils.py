@@ -78,12 +78,11 @@ def setup_generator(c):
             gate_channels=128,
             skip_channels=64,
             aux_channels=c.audio['num_mels'],
-            aux_context_window=c['conv_pad'],
             dropout=0.0,
             bias=True,
             use_weight_norm=True,
-            upsample_conditional_features=True,
-            upsample_factors=c.generator_model_params['upsample_factors'])
+            upsample_factors=c.generator_model_params['upsample_factors'],
+            sample_rates=c.sampling_rates)
     return model
 
 
