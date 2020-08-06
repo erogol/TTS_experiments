@@ -96,7 +96,7 @@ class ParallelWaveganGenerator(torch.nn.Module):
         if use_weight_norm:
             self.apply_weight_norm()
 
-    def forward(self, c, sr=None):
+    def forward(self, c):
         """
             c: (B, C ,T').
             o: Output tensor (B, out_channels, T)
@@ -134,11 +134,11 @@ class ParallelWaveganGenerator(torch.nn.Module):
         return x
 
     @torch.no_grad()
-    def inference(self, c, sr=None):
+    def inference(self, c):
         c = c.to(self.first_conv.weight.device)
         c = torch.nn.functional.pad(
             c, (self.inference_padding, self.inference_padding), 'replicate')
-        return self.forward(c, sr=sr)
+        return self.forward(c)
 
     def remove_weight_norm(self):
         def _remove_weight_norm(m):
