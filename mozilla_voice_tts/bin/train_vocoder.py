@@ -301,7 +301,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             sample_voice = y_hat_vis[0].squeeze(0).detach().cpu().numpy()
             tb_logger.tb_train_audios(global_step,
                                       {'train/audio': sample_voice},
-                                      c.audio["sample_rate"])
+                                      ap.sample_rate)
         end_time = time.time()
 
     # print epoch stats
@@ -465,7 +465,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
     # Sample audio
     sample_voice = y_hat[0].squeeze(0).detach().cpu().numpy()
     tb_logger.tb_eval_audios(global_step, {'eval/audio': sample_voice},
-                             c.audio["sample_rate"])
+                             ap.sample_rate)
 
     # synthesize a full voice
     data_loader.return_segments = False
