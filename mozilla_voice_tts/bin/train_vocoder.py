@@ -8,7 +8,8 @@ import random
 from inspect import signature
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, DistributedSampler
+from torch.nn.parallel import DistributedDataParallel
 
 from mozilla_voice_tts.utils.audio import AudioProcessor
 from mozilla_voice_tts.utils.console_logger import ConsoleLogger
@@ -25,8 +26,7 @@ from mozilla_voice_tts.utils.training import setup_torch_training_env
 from mozilla_voice_tts.vocoder.datasets.gan_dataset import GANDataset
 from mozilla_voice_tts.vocoder.datasets.preprocess import (load_wav_data,
                                                            load_wav_feat_data)
-# from distribute import (DistributedSampler, apply_gradient_allreduce,
-#                         init_distributed, reduce_tensor)
+from mozilla_voice_tts.tts.utils.distribute import init_distributed, reduce_tensor
 from mozilla_voice_tts.vocoder.layers.losses import (DiscriminatorLoss,
                                                      GeneratorLoss)
 from mozilla_voice_tts.vocoder.utils.generic_utils import (plot_results,
@@ -53,12 +53,14 @@ def setup_loader(ap, is_val=False, verbose=False):
                              use_cache=c.use_cache,
                              verbose=verbose)
         dataset.shuffle_mapping()
-        # sampler = DistributedSampler(dataset) if num_gpus > 1 else None
+        sampler = DistributedSampler(
+            dataset=dataset,
+        )
         loader = DataLoader(dataset,
                             batch_size=1 if is_val else c.batch_size,
                             shuffle=True,
                             drop_last=False,
-                            sampler=None,
+                            sampler=sampler,
                             num_workers=c.num_val_loader_workers
                             if is_val else c.num_loader_workers,
                             pin_memory=False)
@@ -239,7 +241,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
-            model_G.sample_rate= new_sr
+            model_G.sample_rate = new_sr
 
         step_time = time.time() - start_time
         epoch_time += step_time
@@ -490,9 +492,9 @@ def main(args):  # pylint: disable=redefined-outer-name
     ap = AudioProcessor(**c.audio)
 
     # DISTRUBUTED
-    # if num_gpus > 1:
-    # init_distributed(args.rank, num_gpus, args.group_id,
-    #  c.distributed["backend"], c.distributed["url"])
+    if num_gpus > 1:
+        init_distributed(args.rank, num_gpus, args.group_id,
+                         c.distributed["backend"], c.distributed["url"])
 
     # setup models
     model_gen = setup_generator(c)
@@ -569,9 +571,10 @@ def main(args):  # pylint: disable=redefined-outer-name
         model_disc.cuda()
         criterion_disc.cuda()
 
-    # DISTRUBUTED
-    # if num_gpus > 1:
-    #     model = apply_gradient_allreduce(model)
+    # DISTRIBUTED
+    if num_gpus > 1:
+        model_gen = DistributedDataParallel(model_gen)
+        model_disc = DistributedDataParallel(model_disc)
 
     num_params = count_parameters(model_gen)
     print(" > Generator has {} parameters".format(num_params), flush=True)
