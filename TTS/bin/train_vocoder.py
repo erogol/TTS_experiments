@@ -49,10 +49,11 @@ def setup_loader(ap, is_val=False, verbose=False):
         dataset.shuffle_mapping()
         sampler = DistributedSampler(
             dataset=dataset,
-        )
+            shuffle=True
+        ) if num_gpus > 1 else None
         loader = DataLoader(dataset,
                             batch_size=1 if is_val else c.batch_size,
-                            shuffle=True,
+                            shuffle=False if num_gpus > 1 else True,
                             drop_last=False,
                             sampler=sampler,
                             num_workers=c.num_val_loader_workers
@@ -263,53 +264,55 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             c_logger.print_train_step(batch_n_iter, num_iter, global_step,
                                       log_dict, loss_dict, keep_avg.avg_values)
 
-        # plot step stats
-        if global_step % 10 == 0:
-            iter_stats = {
-                "lr_G": current_lr_G,
-                "lr_D": current_lr_D,
-                "step_time": step_time
-            }
-            iter_stats.update(loss_dict)
-            tb_logger.tb_train_iter_stats(global_step, iter_stats)
+        if args.rank == 0:
+            # plot step stats
+            if global_step % 10 == 0:
+                iter_stats = {
+                    "lr_G": current_lr_G,
+                    "lr_D": current_lr_D,
+                    "step_time": step_time
+                }
+                iter_stats.update(loss_dict)
+                tb_logger.tb_train_iter_stats(global_step, iter_stats)
 
-        # save checkpoint
-        if global_step % c.save_step == 0:
-            if c.checkpoint:
-                # save model
-                save_checkpoint(model_G,
-                                optimizer_G,
-                                scheduler_G,
-                                model_D,
-                                optimizer_D,
-                                scheduler_D,
-                                global_step,
-                                epoch,
-                                OUT_PATH,
-                                model_losses=loss_dict)
+            # save checkpoint
+            if global_step % c.save_step == 0:
+                if c.checkpoint:
+                    # save model
+                    save_checkpoint(model_G,
+                                    optimizer_G,
+                                    scheduler_G,
+                                    model_D,
+                                    optimizer_D,
+                                    scheduler_D,
+                                    global_step,
+                                    epoch,
+                                    OUT_PATH,
+                                    model_losses=loss_dict)
 
-            # compute spectrograms
-            figures = plot_results(y_hat_vis, y_G, ap, global_step,
-                                   'train')
-            tb_logger.tb_train_figures(global_step, figures)
+                # compute spectrograms
+                figures = plot_results(y_hat_vis, y_G, ap, global_step,
+                                    'train')
+                tb_logger.tb_train_figures(global_step, figures)
 
-            # Sample audio
-            sample_voice = y_hat_vis[0].squeeze(0).detach().cpu().numpy()
-            tb_logger.tb_train_audios(global_step,
-                                      {'train/audio': sample_voice},
-                                      ap.sample_rate)
+                # Sample audio
+                sample_voice = y_hat_vis[0].squeeze(0).detach().cpu().numpy()
+                tb_logger.tb_train_audios(global_step,
+                                        {'train/audio': sample_voice},
+                                        ap.sample_rate)
         end_time = time.time()
 
     # print epoch stats
     c_logger.print_train_epoch_end(global_step, epoch, epoch_time, keep_avg)
 
-    # Plot Training Epoch Stats
-    epoch_stats = {"epoch_time": epoch_time}
-    epoch_stats.update(keep_avg.avg_values)
-    tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
-    # TODO: plot model stats
-    # if c.tb_model_param_stats:
-    # tb_logger.tb_model_weights(model, global_step)
+    if args.rank == 0:
+        # Plot Training Epoch Stats
+        epoch_stats = {"epoch_time": epoch_time}
+        epoch_stats.update(keep_avg.avg_values)
+        tb_logger.tb_train_epoch_stats(global_step, epoch_stats)
+        # TODO: plot model stats
+        # if c.tb_model_param_stats:
+        # tb_logger.tb_model_weights(model, global_step)
     return keep_avg.avg_values, global_step
 
 
@@ -454,19 +457,20 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
         if c.print_eval:
             c_logger.print_eval_step(num_iter, loss_dict, keep_avg.avg_values)
 
-    # compute spectrograms
-    figures = plot_results(y_hat, y_G, ap, global_step, 'eval')
-    tb_logger.tb_eval_figures(global_step, figures)
+    if args.rank == 0:
+        # compute spectrograms
+        figures = plot_results(y_hat, y_G, ap, global_step, 'eval')
+        tb_logger.tb_eval_figures(global_step, figures)
 
-    # Sample audio
-    sample_voice = y_hat[0].squeeze(0).detach().cpu().numpy()
-    tb_logger.tb_eval_audios(global_step, {'eval/audio': sample_voice},
-                             ap.sample_rate)
+        # Sample audio
+        sample_voice = y_hat[0].squeeze(0).detach().cpu().numpy()
+        tb_logger.tb_eval_audios(global_step, {'eval/audio': sample_voice},
+                                ap.sample_rate)
 
-    # synthesize a full voice
-    data_loader.return_segments = False
+        # synthesize a full voice
+        data_loader.return_segments = False
 
-    tb_logger.tb_eval_stats(global_step, keep_avg.avg_values)
+        tb_logger.tb_eval_stats(global_step, keep_avg.avg_values)
 
     return keep_avg.avg_values
 
@@ -487,6 +491,8 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     # DISTRUBUTED
     if num_gpus > 1:
+        print()
+        torch.cuda.set_device(args.rank)
         init_distributed(args.rank, num_gpus, args.group_id,
                          c.distributed["backend"], c.distributed["url"])
 
@@ -567,8 +573,8 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     # DISTRIBUTED
     if num_gpus > 1:
-        model_gen = DistributedDataParallel(model_gen)
-        model_disc = DistributedDataParallel(model_disc)
+        model_gen = DistributedDataParallel(model_gen,  device_ids=[args.rank])
+        model_disc = DistributedDataParallel(model_disc,  device_ids=[args.rank])
 
     num_params = count_parameters(model_gen)
     print(" > Generator has {} parameters".format(num_params), flush=True)

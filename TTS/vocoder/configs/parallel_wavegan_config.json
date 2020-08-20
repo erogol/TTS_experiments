@@ -35,10 +35,10 @@
     },
 
     // DISTRIBUTED TRAINING
-    // "distributed":{
-    //     "backend": "nccl",
-    //     "url": "tcp:\/\/localhost:54321"
-    // },
+    "distributed":{
+        "backend": "nccl",
+        "url": "tcp:\/\/localhost:54321"
+    },
 
     // MODEL PARAMETERS
     "use_pqmf": true,
@@ -85,7 +85,10 @@
     "generator_model_params": {
         "upsample_factors":[4, 4, 4, 4],
         "stacks": 3,
-        "num_res_blocks": 30
+        "num_res_blocks": 30,
+        "res_channels": 96,
+        "gate_channels": 192,
+        "skip_channels": 96
     },
 
     // DATASET
