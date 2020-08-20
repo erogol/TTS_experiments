@@ -27,6 +27,7 @@ from TTS.vocoder.utils.generic_utils import (plot_results, setup_discriminator,
                                              setup_generator)
 from TTS.vocoder.utils.io import save_best_model, save_checkpoint
 
+
 use_cuda, num_gpus = setup_torch_training_env(True, True)
 
 
@@ -46,12 +47,14 @@ def setup_loader(ap, is_val=False, verbose=False):
                              use_cache=c.use_cache,
                              verbose=verbose)
         dataset.shuffle_mapping()
-        # sampler = DistributedSampler(dataset) if num_gpus > 1 else None
+        sampler = DistributedSampler(
+            dataset=dataset,
+        )
         loader = DataLoader(dataset,
                             batch_size=1 if is_val else c.batch_size,
                             shuffle=True,
                             drop_last=False,
-                            sampler=None,
+                            sampler=sampler,
                             num_workers=c.num_val_loader_workers
                             if is_val else c.num_loader_workers,
                             pin_memory=False)
@@ -232,7 +235,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
-            model_G.sample_rate= new_sr
+            model_G.sample_rate = new_sr
 
         step_time = time.time() - start_time
         epoch_time += step_time
@@ -483,9 +486,9 @@ def main(args):  # pylint: disable=redefined-outer-name
     ap = AudioProcessor(**c.audio)
 
     # DISTRUBUTED
-    # if num_gpus > 1:
-    # init_distributed(args.rank, num_gpus, args.group_id,
-    #  c.distributed["backend"], c.distributed["url"])
+    if num_gpus > 1:
+        init_distributed(args.rank, num_gpus, args.group_id,
+                         c.distributed["backend"], c.distributed["url"])
 
     # setup models
     model_gen = setup_generator(c)
@@ -562,9 +565,10 @@ def main(args):  # pylint: disable=redefined-outer-name
         model_disc.cuda()
         criterion_disc.cuda()
 
-    # DISTRUBUTED
-    # if num_gpus > 1:
-    #     model = apply_gradient_allreduce(model)
+    # DISTRIBUTED
+    if num_gpus > 1:
+        model_gen = DistributedDataParallel(model_gen)
+        model_disc = DistributedDataParallel(model_disc)
 
     num_params = count_parameters(model_gen)
     print(" > Generator has {} parameters".format(num_params), flush=True)
