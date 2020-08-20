@@ -112,7 +112,10 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         new_sr = random.choice(c.sampling_rates)
         ap.sample_rate = new_sr
         data_loader.dataset.sample_rate = new_sr
-        model_G.sample_rate= new_sr
+        if hasattr(model_G, 'module'):
+            model_G.module.sample_rate= new_sr
+        else:
+            model_G.sample_rate= new_sr
 
     for num_iter, data in enumerate(data_loader):
         start_time = time.time()
@@ -242,7 +245,10 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
-            model_G.sample_rate = new_sr
+            if hasattr(model_G, 'module'):
+                model_G.module.sample_rate= new_sr
+            else:
+                model_G.sample_rate= new_sr
 
         step_time = time.time() - start_time
         epoch_time += step_time
@@ -338,7 +344,10 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
         new_sr = random.choice(c.sampling_rates)
         ap.sample_rate = new_sr
         data_loader.dataset.sample_rate = new_sr
-        model_G.sample_rate = new_sr
+        if hasattr(model_G, 'module'):
+            model_G.module.sample_rate= new_sr
+        else:
+            model_G.sample_rate= new_sr
 
     for num_iter, data in enumerate(data_loader):
         start_time = time.time()
@@ -446,7 +455,10 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
-            model_G.sample_rate= new_sr
+            if hasattr(model_G, 'module'):
+                model_G.module.sample_rate= new_sr
+            else:
+                model_G.sample_rate= new_sr
 
         step_time = time.time() - start_time
         epoch_time += step_time
