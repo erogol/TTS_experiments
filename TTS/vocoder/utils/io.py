@@ -5,9 +5,19 @@ import datetime
 
 def save_model(model, optimizer, scheduler, model_disc, optimizer_disc,
                scheduler_disc, current_step, epoch, output_path, **kwargs):
-    model_state = model.state_dict()
-    model_disc_state = model_disc.state_dict()\
-         if model_disc is not None else None
+    if hasattr(model, 'module'):
+        model_state = model.module.state_dict()
+    else:
+        model_state = model.state_dict()
+
+    if model_disc is not None:
+        if hasattr(model_disc, 'module'):
+            model_disc_state = model_disc.module.state_dict()
+        else:
+            model_disc_state = model_disc.state_dict()
+    else:
+        model_disc_state = None
+
     optimizer_state = optimizer.state_dict()\
          if optimizer is not None else None
     optimizer_disc_state = optimizer_disc.state_dict()\
