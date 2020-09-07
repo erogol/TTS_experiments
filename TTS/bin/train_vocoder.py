@@ -31,6 +31,13 @@ from TTS.vocoder.utils.io import save_best_model, save_checkpoint
 use_cuda, num_gpus = setup_torch_training_env(True, True)
 
 
+def check_D_use_cond_feats(model_D):
+    return (not hasattr(model_D, 'module')
+                    and len(signature(model_D.forward).parameters) == 2
+                ) or (hasattr(model_D, 'module') and len(
+                    signature(model_D.module.forward).parameters) == 2)
+
+
 def setup_loader(ap, is_val=False, verbose=False):
     if is_val and not c.run_eval:
         loader = None
@@ -141,7 +148,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
         if global_step > c.steps_to_start_discriminator:
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if check_D_use_cond_feats(model_D):
                 D_out_fake = model_D(y_hat, c_G)
             else:
                 D_out_fake = model_D(y_hat)
@@ -196,7 +203,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
                 y_hat = model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if check_D_use_cond_feats(model_D):
                 D_out_fake = model_D(y_hat.detach(), c_D)
                 D_out_real = model_D(y_D, c_D)
             else:
@@ -333,7 +340,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
     c_logger.print_eval_start()
 
     new_sr = None
-   # pick a sampling rate for next iter
+    # pick a sampling rate for next iter
     if 'sampling_rates' in c:
         new_sr = random.choice(c.sampling_rates)
         ap.sample_rate = new_sr
@@ -371,7 +378,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
         scores_fake, feats_fake, feats_real = None, None, None
         if global_step > c.steps_to_start_discriminator:
 
-            if len(signature(model_D.forward).parameters) == 2:
+            if check_D_use_cond_feats(model_D):
                 D_out_fake = model_D(y_hat, c_G)
             else:
                 D_out_fake = model_D(y_hat)
@@ -417,7 +424,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
                 y_hat = model_G.pqmf_synthesis(y_hat)
 
             # run D with or without cond. features
-            if len(signature(model_D.forward).parameters) == 2:
+            if check_D_use_cond_feats(model_D):
                 D_out_fake = model_D(y_hat.detach(), c_G)
                 D_out_real = model_D(y_G, c_G)
             else:
