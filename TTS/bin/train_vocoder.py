@@ -592,8 +592,8 @@ def main(args):  # pylint: disable=redefined-outer-name
 
     # DISTRIBUTED
     if num_gpus > 1:
-        model_gen = DistributedDataParallel(model_gen,  device_ids=[args.rank])
-        model_disc = DistributedDataParallel(model_disc,  device_ids=[args.rank])
+        model_gen = DistributedDataParallel(model_gen, device_ids=[args.rank])
+        model_disc = DistributedDataParallel(model_disc, device_ids=[args.rank])
 
     num_params = count_parameters(model_gen)
     print(" > Generator has {} parameters".format(num_params), flush=True)
