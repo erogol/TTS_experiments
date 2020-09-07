@@ -66,6 +66,9 @@ def count_parameters(model):
 
 
 def set_init_dict(model_dict, checkpoint_state, c):
+    """partial initialization of model from a checkpoint
+    only using matching layers"""
+
     # Partial initialization: if there is a mismatch with new and old layer, it is skipped.
     for k, v in checkpoint_state.items():
         if k not in model_dict:
