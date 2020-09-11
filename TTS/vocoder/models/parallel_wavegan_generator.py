@@ -1,9 +1,49 @@
 import math
 import numpy as np
 import torch
+from torch import nn
+from torch.nn import functional as F
 
 from TTS.vocoder.layers.parallel_wavegan import ResidualBlock
 from TTS.vocoder.layers.upsample import ConvUpsample
+
+
+class ResBlock(nn.Module) :
+    def __init__(self, dims) :
+        super().__init__()
+        self.conv1 = nn.Conv1d(dims, dims, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv1d(dims, dims, kernel_size=1, bias=False)
+        self.batch_norm1 = nn.BatchNorm1d(dims)
+        self.batch_norm2 = nn.BatchNorm1d(dims)
+
+    def forward(self, x) :
+        residual = x
+        x = self.conv1(x)
+        x = self.batch_norm1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = self.batch_norm2(x)
+        return x + residual
+
+
+class ResNet(nn.Module) :
+    def __init__(self, res_blocks, in_channels, hid_channels, out_channels) :
+        super().__init__()
+        self.conv_in = nn.Conv1d(in_channels, hid_channels, kernel_size=3, padding=1, bias=False)
+        self.batch_norm = nn.BatchNorm1d(hid_channels)
+        self.layers = nn.ModuleList()
+        for _ in range(res_blocks) :
+            self.layers.append(ResBlock(hid_channels))
+        self.conv_out = nn.Conv1d(hid_channels, out_channels, kernel_size=1)
+
+    def forward(self, x) :
+        x = self.conv_in(x)
+        x = self.batch_norm(x)
+        x = F.relu(x)
+        for f in self.layers :
+            x = f(x)
+        x = self.conv_out(x)
+        return x
 
 
 class ParallelWaveganGenerator(torch.nn.Module):
@@ -53,6 +93,9 @@ class ParallelWaveganGenerator(torch.nn.Module):
                                           res_channels,
                                           kernel_size=1,
                                           bias=True)
+
+        # resnet block
+        self.resnet = ResNet(8, 80, 128, 80)
 
         # define conv + upsampling network
         if isinstance(sample_rates, list):
@@ -104,6 +147,9 @@ class ParallelWaveganGenerator(torch.nn.Module):
         # random noise
         x = torch.randn([c.shape[0], 1, c.shape[2] * self.upsample_scale])
         x = x.to(self.first_conv.bias.device)
+
+        # resnet for c
+        c = self.resnet(c)
 
         # perform upsampling
         if self.sample_rate is not None:
