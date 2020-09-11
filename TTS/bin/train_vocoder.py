@@ -108,7 +108,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
 
     new_sr = None
     # pick a sampling rate
-    if 'sampling_rates' in c:
+    if 'sampling_rates' in c and isinstance(c.sampling_rates, list):
         new_sr = random.choice(c.sampling_rates)
         ap.sample_rate = new_sr
         data_loader.dataset.sample_rate = new_sr
@@ -241,7 +241,7 @@ def train(model_G, criterion_G, optimizer_G, model_D, criterion_D, optimizer_D,
                     loss_dict[key] = value.item()
 
         # pick a sampling rate for next iter
-        if 'sampling_rates' in c:
+        if 'sampling_rates' in c and isinstance(c.sampling_rates, list):
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
@@ -340,7 +340,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
 
     new_sr = None
     # pick a sampling rate for next iter
-    if 'sampling_rates' in c:
+    if 'sampling_rates' in c and isinstance(c.sampling_rates, list):
         new_sr = random.choice(c.sampling_rates)
         ap.sample_rate = new_sr
         data_loader.dataset.sample_rate = new_sr
@@ -451,7 +451,7 @@ def evaluate(model_G, criterion_G, model_D, criterion_D, ap, global_step, epoch)
                     loss_dict[key] = value.item()
 
         # pick a sampling rate for next iter
-        if 'sampling_rates' in c:
+        if 'sampling_rates' in c and isinstance(c.sampling_rates, list):
             new_sr = random.choice(c.sampling_rates)
             ap.sample_rate = new_sr
             data_loader.dataset.sample_rate = new_sr
