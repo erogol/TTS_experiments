@@ -70,7 +70,7 @@ def setup_generator(c):
     if c.generator_model in 'fullband_melgan_generator':
         model = MyModel(
             in_channels=c.audio['num_mels'],
-            out_channels=4,
+            out_channels=1,
             proj_kernel=7,
             base_channels=512,
             upsample_factors=c.generator_model_params['upsample_factors'],
