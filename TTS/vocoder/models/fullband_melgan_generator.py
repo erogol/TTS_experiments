@@ -7,7 +7,7 @@ from TTS.vocoder.layers.pqmf import PQMF
 class FullbandMelganGenerator(MelganGenerator):
     def __init__(self,
                  in_channels=80,
-                 out_channels=4,
+                 out_channels=1,
                  proj_kernel=7,
                  base_channels=512,
                  upsample_factors=(2, 8, 2, 2),
