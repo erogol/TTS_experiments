@@ -47,7 +47,7 @@ def to_camel(text):
 def setup_model(num_chars, num_speakers, c, speaker_embedding_dim=None):
     print(" > Using model: {}".format(c.model))
     MyModel = importlib.import_module('TTS.tts.models.' + c.model.lower())
-    MyModel = getattr(MyModel, to_camel(c.model))
+    MyModel = getattr(MyModel, c.model)
     if c.model.lower() in "tacotron":
         model = MyModel(num_chars=num_chars,
                         num_speakers=num_speakers,
@@ -58,6 +58,8 @@ def setup_model(num_chars, num_speakers, c, speaker_embedding_dim=None):
                         gst_embedding_dim=c.gst['gst_embedding_dim'],
                         gst_num_heads=c.gst['gst_num_heads'],
                         gst_style_tokens=c.gst['gst_style_tokens'],
+                        disable_gst=c.gst['disable_gst'],
+                        gst_use_speaker_embedding=c.gst['gst_use_speaker_embedding'],
                         memory_size=c.memory_size,
                         attn_type=c.attention_type,
                         attn_win=c.windowing,
@@ -84,6 +86,8 @@ def setup_model(num_chars, num_speakers, c, speaker_embedding_dim=None):
                         gst_embedding_dim=c.gst['gst_embedding_dim'],
                         gst_num_heads=c.gst['gst_num_heads'],
                         gst_style_tokens=c.gst['gst_style_tokens'],
+                        disable_gst=c.gst['disable_gst'],
+                        gst_use_speaker_embedding=c.gst['gst_use_speaker_embedding'],
                         attn_type=c.attention_type,
                         attn_win=c.windowing,
                         attn_norm=c.attention_norm,
