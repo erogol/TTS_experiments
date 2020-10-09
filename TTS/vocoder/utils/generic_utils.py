@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from TTS.tts.utils.visual import plot_spectrogram
+from TTS.vocoder.models.wavernn import WaveRNN
 
 
 def plot_results(y_hat, y, ap, global_step, name_prefix):
@@ -151,6 +152,24 @@ def setup_discriminator(c):
             bias=True
         )
     return model
+
+
+def setup_wavernn(c, ap):
+    print(" > WaveRNN model.")
+    return WaveRNN(rnn_dims=c.model['rnn_dims'],
+                   fc_dims=c.model['fc_dims'],
+                   mode=c.mode,
+                   mulaw=c.mulaw,
+                   pad=c.conv_pad,
+                   use_aux_net=c.model['use_aux_net'],
+                   use_upsample_net=c.model['use_upsample_net'],
+                   upsample_factors=c.model['upsample_factors'],
+                   feat_dims=c.audio['num_mels'],
+                   compute_dims=c.model['compute_dims'],
+                   res_out_dims=c.model['res_out_dims'],
+                   res_blocks=c.model['res_blocks'],
+                   hop_length=ap.hop_length,
+                   sample_rate=ap.sample_rate)
 
 
 # def check_config(c):

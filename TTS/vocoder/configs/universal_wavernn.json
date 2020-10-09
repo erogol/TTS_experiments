@@ -1,0 +1,105 @@
+{
+    "run_name": "libriTTS-clean-360",
+    "run_description": "Training a universal vocoder.",
+
+
+    // AUDIO PARAMETERS
+    "audio":{
+        "fft_size": 1024,         // number of stft frequency levels. Size of the linear spectogram frame.
+        "win_length": 1024,      // stft window length in ms.
+        "hop_length": 256,       // stft window hop-lengh in ms.
+        "frame_length_ms": null, // stft window length in ms.If null, 'win_length' is used.
+        "frame_shift_ms": null,  // stft window hop-lengh in ms. If null, 'hop_length' is used.
+
+        // Audio processing parameters
+        "sample_rate": 24000,   // DATASET-RELATED: wav sample-rate. If different than the original data, it is resampled.
+        "preemphasis": 0.0,     // pre-emphasis to reduce spec noise and make it more structured. If 0.0, no -pre-emphasis.
+        "ref_level_db": 0,     // reference level db, theoretically 20db is the sound of air.
+
+        // Silence trimming
+        "do_trim_silence": true,// enable trimming of slience of audio as you load it. LJspeech (false), TWEB (false), Nancy (true)
+        "trim_db": 60,          // threshold for timming silence. Set this according to your dataset.
+
+        // MelSpectrogram parameters
+        "num_mels": 80,         // size of the mel spec frame.
+        "mel_fmin": 50.0,        // minimum freq level for mel-spec. ~50 for male and ~95 for female voices. Tune for dataset!!
+        "mel_fmax": 7600.0,     // maximum freq level for mel-spec. Tune for dataset!!
+        "spec_gain": 1.0,         // scaler value appplied after log transform of spectrogram.
+
+        // Normalization parameters
+        "signal_norm": true,    // normalize spec values. Mean-Var normalization if 'stats_path' is defined otherwise range normalization defined by the other params.
+        "min_level_db": -100,   // lower bound for normalization
+        "symmetric_norm": true, // move normalization to range [-1, 1]
+        "max_norm": 4.0,        // scale normalization to range [-max_norm, max_norm] or [0, max_norm]
+        "clip_norm": true,      // clip normalized values into the range.
+        "stats_path": "/home/erogol/Data/libritts/LibriTTS/scale_stats.npy"    // DO NOT USE WITH MULTI_SPEAKER MODEL. scaler stats file computed by 'compute_statistics.py'. If it is defined, mean-std based notmalization is used and other normalization params are ignored
+    },
+
+    "distributed":{
+        "backend": "nccl",
+        "url": "tcp:\/\/localhost:54321"
+    },
+
+    // MODEL PARAMETERS
+    "model":{
+        "rnn_dims": 512,
+        "fc_dims": 512,
+        "use_aux_net": true,
+        "use_upsample_net": true,
+        "compute_dims": 128,
+        "res_out_dims": 128,
+        "res_blocks": 10,
+        "upsample_factors": [4, 8, 8]
+    },
+
+    // TRAINING PARAMETERS
+    "epochs": 10000,
+    "grad_clip": 500,
+    "lr": 0.001,
+    "warmup_steps": 10,
+    "checkpoint_step": 10000,
+
+    "reinit_layers": [],    // give a list of layer names to restore from the given checkpoint. If not defined, it reloads all heuristically matching layers.
+
+
+    // TENSORBOARD and LOGGING
+    "print_step": 1,       // Number of steps to log traning on console.
+    "print_eval": false,     // If True, it prints loss values for each step in eval run.
+    "save_step": 25000,      // Number of training steps expected to plot training stats on TB and save model checkpoints.
+    "checkpoint": true,     // If true, it saves checkpoints per "save_step"
+    "tb_model_param_stats": false,     // true, plots param stats per layer on tensorboard. Might be memory consuming, but good for debugging.
+
+
+    // DATA LOADER
+    "batch_size": 32,
+    "eval_batch_size": 2,
+    "num_loader_workers": 0,
+    "num_val_loader_workers": 0,
+    "seq_len": 2560,
+    "pad_short": 2000,        // padding for short samples
+    "conv_pad": 2,
+    "use_noise_augment": false,
+    "use_cache": true,        // keep features in memory to reduce data loading time. This might cause OOM error.
+
+
+    // VALIDATION
+    "run_eval": true,
+    "test_delay_epochs": 0,  //Until attention is aligned, testing only wastes computation time.
+
+
+    // SETUP SCHEDULER
+    //"lr_scheduler_gen": "MultiStepLR",   // one of the schedulers from https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+    //"lr_scheduler_gen_params": {
+    //    "gamma": 0.5,
+    //    "milestones": [100000, 200000, 300000, 400000, 500000, 600000]
+    //},
+
+    // TRAINING MODE
+    "mode": "mold",         // mold [string], gauss [string], bits [int]
+    "mulaw": false,         // apply mulaw if mode is bits
+
+    "data_path": "/home/erogol/Data/libritts/LibriTTS/train-clean-360/",
+    "feature_path": null,
+    "output_path": "/home/erogol/Models/LJSpeech/",
+    "eval_split_size": 10   // number of samples for evaluation
+}

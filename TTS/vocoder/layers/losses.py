@@ -1,7 +1,8 @@
 import torch
-
 from torch import nn
 from torch.nn import functional as F
+from TTS.vocoder.layers.distribution import (discretized_mix_logistic_loss,
+                                             gaussian_loss)
 
 
 class TorchSTFT():
@@ -306,4 +307,20 @@ class DiscriminatorLoss(nn.Module):
             loss += hinge_D_loss
 
         return_dict['D_loss'] = loss
+        return return_dict
+
+
+class WaveRNNLoss(nn.Module):
+    def __init__(self, C):
+        super().__init__()
+        if C.mode == 'mold':
+            self.criterion = discretized_mix_logistic_loss
+        elif C.mode == 'gauss':
+            self.criterion = gaussian_loss
+        elif isinstance(C.mode, int):
+            self.criterion = torch.nn.CrossEntropyLoss()
+
+    def forward(self, y_hat, y):
+        return_dict = {}
+        return_dict['loss'] = self.criterion(y_hat, y)
         return return_dict
