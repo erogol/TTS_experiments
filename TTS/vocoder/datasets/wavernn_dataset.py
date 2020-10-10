@@ -99,11 +99,12 @@ class WaveRNNDataset(Dataset):
             else:
                 audio = self.ap.load_wav(wavpath)
 
-                if len(audio) < self.seq_len :
-                    audio = np.pad(audio, (0, self.seq_len + self.pad_short - len(audio)), \
+                if len(audio) <= self.seq_len + (self.hop_len * self.conv_pad * 2):
+                    audio = np.pad(audio, (0, self.seq_len + (self.hop_len * self.conv_pad * 2) + self.pad_short - len(audio)), \
                             mode='constant', constant_values=0.0)
 
                 mel = self.ap.melspectrogram(audio)
+                assert mel.shape[-1] > self.feat_frame_len, f"{wavpath}"
         else:
 
             # load precomputed features
@@ -141,7 +142,7 @@ class WaveRNNDataset(Dataset):
 
         # check if min mel length is larger than required size
         min_mel_len = np.min([x[0].shape[-1] for x in batch])
-        assert min_mel_len > mel_win
+        assert min_mel_len > mel_win, f"{min_mel_len} vs {mel_win}"
 
         # set offsets for picking a segment
         max_offsets = [x[0].shape[-1] - mel_win for x in batch]
